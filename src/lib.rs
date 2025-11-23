@@ -40,7 +40,7 @@ pub mod python;
 
 // Re-export public API
 pub use api::public::OtlpLibrary;
-pub use config::{Config, ConfigBuilder, ForwardingConfig, AuthConfig};
+pub use config::{Config, ConfigBuilder, ForwardingConfig, ForwardingProtocol, AuthConfig};
 pub use error::{OtlpError, OtlpConfigError, OtlpExportError, OtlpServerError};
 pub use mock::service::MockOtlpService;
 

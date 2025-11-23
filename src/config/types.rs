@@ -129,20 +129,23 @@ fn default_arrow_flight_port() -> u16 {
 /// - `protocols`: Both Protobuf and Arrow Flight enabled by default
 /// - `forwarding`: Disabled by default
 ///
-/// # Example
-///
-/// ```no_run
-/// use otlp_arrow_library::Config;
-///
-/// // Use defaults
-/// let config = Config::default();
-///
-/// // Or use builder
-/// let config = otlp_arrow_library::ConfigBuilder::new()
-///     .output_dir("./custom_output")
-///     .write_interval_secs(10)
-///     .build()?;
-/// ```
+    /// # Example
+    ///
+    /// ```no_run
+    /// use otlp_arrow_library::Config;
+    ///
+    /// // Use defaults
+    /// let config = Config::default();
+    ///
+    /// // Or use builder
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = otlp_arrow_library::ConfigBuilder::new()
+    ///     .output_dir("./custom_output")
+    ///     .write_interval_secs(10)
+    ///     .build()?;
+    /// # Ok(())
+    /// # }
+    /// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// Output directory for Arrow IPC files (default: ./output_dir)
