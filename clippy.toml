@@ -1,0 +1,16 @@
+# Clippy configuration
+# See https://doc.rust-lang.org/clippy/configuration.html
+
+# Allow all warnings by default, but deny in CI
+# CI will use -D warnings flag
+
+# Cognitive complexity threshold (replaces deprecated cyclomatic-complexity-threshold)
+cognitive-complexity-threshold = 50
+
+# Allow some common patterns
+avoid-breaking-exported-api = false
+disallowed-methods = []
+disallowed-types = []
+
+# Allow non-local definitions for PyO3 bindings (known pyo3 macro limitation)
+# This is required because pyo3's #[pymethods] macro generates non-local impl blocks

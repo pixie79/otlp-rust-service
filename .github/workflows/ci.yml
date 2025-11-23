@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Linting and formatting check
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -A non_local_definitions -D warnings
+
+  # Unit and integration tests on Linux
+  test-linux:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      
+      - name: Run tests
+        run: cargo test --all-features --workspace
+      
+      - name: Build Python bindings
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install maturin
+          python3 -m venv .venv
+          source .venv/bin/activate
+          maturin develop --release
+      
+      - name: Run Python tests
+        run: |
+          source .venv/bin/activate
+          python3 -m pip install pytest
+          if [ -f "tests/python/test_*.py" ]; then
+            python3 -m pytest tests/python/ -v
+          fi
+
+  # Unit and integration tests on macOS
+  test-macos:
+    name: Test (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Get Cargo.toml hash
+        id: cargo-hash
+        run: |
+          if [ -f "Cargo.toml" ]; then
+            HASH=$(shasum -a 256 Cargo.toml | cut -d' ' -f1 | head -c 16)
+            echo "hash=$HASH" >> $GITHUB_OUTPUT
+          else
+            echo "hash=default" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ steps.cargo-hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      
+      - name: Run tests
+        run: cargo test --all-features --workspace
+      
+      - name: Build Python bindings
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install maturin
+          python3 -m venv .venv
+          source .venv/bin/activate
+          maturin develop --release
+      
+      - name: Run Python tests
+        run: |
+          source .venv/bin/activate
+          python3 -m pip install pytest
+          if [ -f "tests/python/test_*.py" ]; then
+            python3 -m pytest tests/python/ -v
+          fi
+
+  # Unit and integration tests on Windows
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      
+      - name: Run tests
+        run: cargo test --all-features --workspace
+        shell: cmd
+
+  # Note: Code coverage validation is handled by the separate coverage.yml workflow
+  # to avoid duplicate runs and reduce CI time
+
+  # Build verification
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build library
+        run: cargo build --release --all-features
+      
+      - name: Build examples
+        run: cargo build --release --examples
+      
+      - name: Build binary
+        run: cargo build --release --bin otlp-arrow-service
+
+  # Python bindings build
+  python-build:
+    name: Python Bindings Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install maturin
+        run: pip install maturin
+      
+      - name: Build Python wheel
+        run: maturin build --release
+

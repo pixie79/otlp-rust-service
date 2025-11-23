@@ -1,0 +1,22 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "otlp-arrow-library"
+version = "0.1.0"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.metadata]
+description = "OTLP Arrow Flight Library - Python bindings"
+version = "0.1.0"
+
+[tool.maturin]
+features = []
+module-name = "otlp_arrow_library"
+

@@ -1,0 +1,50 @@
+name: Validate Quickstart Examples
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'specs/**/quickstart.md'
+      - 'examples/**'
+      - 'src/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'specs/**/quickstart.md'
+      - 'examples/**'
+      - 'src/**'
+
+jobs:
+  validate:
+    name: Validate Quickstart Examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Check Rust examples compile
+        run: |
+          cargo check --examples
+          cargo check --example standalone
+          cargo check --example embedded
+      
+      - name: Check standalone service builds
+        run: cargo build --bin otlp-arrow-service --release
+      
+      - name: Check Python example syntax
+        run: |
+          python3 -m py_compile examples/python_example.py
+      
+      - name: Validate quickstart examples
+        run: |
+          if [ -f "scripts/validate_quickstart.sh" ]; then
+            bash scripts/validate_quickstart.sh
+          fi
+

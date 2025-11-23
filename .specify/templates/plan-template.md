@@ -31,7 +31,15 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify compliance with OTLP Rust Service Constitution principles:
+
+- **Code Quality (I)**: Does the design follow Rust best practices? Are complexity and maintainability considered?
+- **Testing Standards (II)**: Is the testing strategy defined? Are TDD, coverage, and test types (unit/integration/contract/performance) planned?
+- **User Experience Consistency (III)**: Are API contracts, error formats, and configuration patterns consistent?
+- **Performance Requirements (IV)**: Are SLOs defined? Are performance targets measurable and achievable?
+- **Observability & Reliability (V)**: Are logging, metrics, tracing, and health checks planned?
+
+Any violations or exceptions MUST be documented in the Complexity Tracking section below.
 
 ## Project Structure
 

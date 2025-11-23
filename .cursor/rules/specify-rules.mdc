@@ -1,0 +1,33 @@
+# otlp-rust-service Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-11-23
+
+## Active Technologies
+- Local filesystem (Arrow IPC Streaming format files) (001-otlp-arrow-library)
+- Rust stable (latest), Python 3.11+ (001-otlp-arrow-library)
+
+- Rust stable channel (latest stable, minimum 1.75+) (001-otlp-arrow-library)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+cargo test [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLOGIES] cargo clippy
+
+## Code Style
+
+Rust stable channel (latest stable, minimum 1.75+): Follow standard conventions
+
+## Recent Changes
+- 001-otlp-arrow-library: Added Rust stable (latest), Python 3.11+
+- 001-otlp-arrow-library: Added Rust stable channel (latest stable, minimum 1.75+)
+- 001-otlp-arrow-library: Added Rust stable channel (latest stable, minimum 1.75+)
+
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->
