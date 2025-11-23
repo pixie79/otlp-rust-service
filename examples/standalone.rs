@@ -5,7 +5,6 @@
 
 use otlp_arrow_library::otlp::{OtlpArrowFlightServer, OtlpGrpcServer};
 use otlp_arrow_library::{Config, OtlpLibrary};
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio::signal;
 use tracing::{info, warn};

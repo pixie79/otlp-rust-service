@@ -29,6 +29,7 @@ struct CircuitBreaker {
     failure_count: Arc<Mutex<u32>>,
     last_failure_time: Arc<Mutex<Option<Instant>>>,
     failure_threshold: u32,
+    #[allow(dead_code)]
     timeout: Duration,
     half_open_timeout: Duration,
 }
@@ -223,7 +224,7 @@ impl OtlpForwarder {
     }
 
     /// Forward metrics asynchronously
-    pub async fn forward_metrics(&self, metrics: &ResourceMetrics) -> Result<(), OtlpError> {
+    pub async fn forward_metrics(&self, _metrics: &ResourceMetrics) -> Result<(), OtlpError> {
         if !self.config.enabled {
             return Ok(()); // Silently skip if disabled
         }

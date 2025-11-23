@@ -309,7 +309,7 @@ pub(crate) fn convert_trace_request_to_spans(
                     events: opentelemetry_sdk::trace::SpanEvents::default(),
                     links: opentelemetry_sdk::trace::SpanLinks::default(),
                     status,
-                    dropped_attributes_count: span.dropped_attributes_count as u32,
+                    dropped_attributes_count: span.dropped_attributes_count,
                     parent_span_is_remote: false,
                     instrumentation_scope,
                 };

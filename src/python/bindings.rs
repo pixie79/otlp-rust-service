@@ -2,6 +2,8 @@
 //!
 //! Provides Python bindings for the OtlpLibrary struct and related types.
 
+#![allow(non_local_definitions)]
+
 use crate::api::public::OtlpLibrary;
 use crate::config::{Config, ConfigBuilder};
 use opentelemetry::trace::{

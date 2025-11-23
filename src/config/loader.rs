@@ -126,7 +126,7 @@ impl ConfigLoader {
             info!("Loading configuration with defaults and environment variable overrides");
         }
 
-        let mut config = provided.unwrap_or_else(Config::default);
+        let mut config = provided.unwrap_or_default();
 
         debug!(
             output_dir = %config.output_dir.display(),
@@ -298,11 +298,10 @@ impl ConfigLoader {
         // OTLP_FORWARDING_ENABLED
         if let Ok(enabled) = env::var("OTLP_FORWARDING_ENABLED") {
             if enabled.parse::<bool>().unwrap_or(false) {
-                use crate::config::types::ForwardingConfig;
                 let mut forwarding = config
                     .forwarding
                     .take()
-                    .unwrap_or_else(ForwardingConfig::default);
+                    .unwrap_or_default();
                 forwarding.enabled = true;
 
                 // OTLP_FORWARDING_ENDPOINT_URL

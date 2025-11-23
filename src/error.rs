@@ -78,6 +78,7 @@ pub enum OtlpExportError {
 }
 
 /// Server-related errors
+#[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
 pub enum OtlpServerError {
     /// Failed to bind server address
@@ -95,9 +96,6 @@ pub enum OtlpServerError {
 
 impl From<anyhow::Error> for OtlpError {
     fn from(err: anyhow::Error) -> Self {
-        OtlpError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            err.to_string(),
-        ))
+        OtlpError::Io(std::io::Error::other(err.to_string()))
     }
 }

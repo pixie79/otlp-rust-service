@@ -49,7 +49,7 @@ use tracing_subscriber::EnvFilter;
 
 /// Initialize structured logging
 pub fn init_logging() {
-    let _ = tracing_subscriber::fmt()
+    tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_target(false)
         .with_thread_ids(false)
@@ -64,7 +64,6 @@ mod tests {
     #[test]
     fn test_library_initialization() {
         init_logging();
-        // Basic smoke test
-        assert!(true);
+        // Basic smoke test - just verify logging initializes without panicking
     }
 }

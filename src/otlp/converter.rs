@@ -32,7 +32,6 @@ use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequ
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::SpanData;
-use std::sync::Arc;
 use tracing::{error, warn};
 
 use crate::otlp::server;
@@ -198,7 +197,7 @@ impl FormatConverter {
                 )))
             })?;
 
-        let resource_metrics = match resource_metrics {
+        let _resource_metrics = match resource_metrics {
             Some(rm) => rm,
             None => return Ok(None),
         };
@@ -241,7 +240,7 @@ impl FormatConverter {
     /// Helper method to convert ResourceMetrics (from any source) to Protobuf format.
     pub fn resource_metrics_to_protobuf(
         &self,
-        metrics: &ResourceMetrics,
+        _metrics: &ResourceMetrics,
     ) -> Result<Option<ExportMetricsServiceRequest>, OtlpError> {
         // Create a minimal Protobuf request
         let request = ExportMetricsServiceRequest::default();

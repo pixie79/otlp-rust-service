@@ -106,7 +106,7 @@ async fn test_arrow_ipc_conversion_traces() {
     use arrow::ipc::reader::StreamReader;
     use std::fs::File;
 
-    let arrow_file = File::open(&files[0].path()).unwrap();
+    let arrow_file = File::open(files[0].path()).unwrap();
     let reader = StreamReader::try_new(arrow_file, None).unwrap();
 
     let mut batch_count = 0;

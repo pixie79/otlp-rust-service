@@ -116,31 +116,42 @@ fn test_forwarding_config_validation() {
     use otlp_arrow_library::config::{ForwardingConfig, ForwardingProtocol};
 
     // Valid forwarding config
-    let mut forwarding = ForwardingConfig::default();
-    forwarding.enabled = true;
-    forwarding.endpoint_url = Some("https://example.com/otlp".to_string());
-    forwarding.protocol = ForwardingProtocol::Protobuf;
+    let forwarding = ForwardingConfig {
+        enabled: true,
+        endpoint_url: Some("https://example.com/otlp".to_string()),
+        protocol: ForwardingProtocol::Protobuf,
+        authentication: None,
+    };
 
     assert!(forwarding.validate().is_ok());
 
     // Invalid: enabled but no endpoint
-    let mut forwarding_invalid = ForwardingConfig::default();
-    forwarding_invalid.enabled = true;
-    forwarding_invalid.endpoint_url = None;
+    let forwarding_invalid = ForwardingConfig {
+        enabled: true,
+        endpoint_url: None,
+        protocol: ForwardingProtocol::Protobuf,
+        authentication: None,
+    };
 
     assert!(forwarding_invalid.validate().is_err());
 
     // Invalid: enabled but empty endpoint
-    let mut forwarding_empty = ForwardingConfig::default();
-    forwarding_empty.enabled = true;
-    forwarding_empty.endpoint_url = Some("".to_string());
+    let forwarding_empty = ForwardingConfig {
+        enabled: true,
+        endpoint_url: Some("".to_string()),
+        protocol: ForwardingProtocol::Protobuf,
+        authentication: None,
+    };
 
     assert!(forwarding_empty.validate().is_err());
 
     // Invalid: endpoint without http/https
-    let mut forwarding_bad_url = ForwardingConfig::default();
-    forwarding_bad_url.enabled = true;
-    forwarding_bad_url.endpoint_url = Some("ftp://example.com/otlp".to_string());
+    let forwarding_bad_url = ForwardingConfig {
+        enabled: true,
+        endpoint_url: Some("ftp://example.com/otlp".to_string()),
+        protocol: ForwardingProtocol::Protobuf,
+        authentication: None,
+    };
 
     assert!(forwarding_bad_url.validate().is_err());
 }

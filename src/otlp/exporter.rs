@@ -77,7 +77,7 @@ impl OtlpFileExporter {
         let max_file_size = 100 * 1024 * 1024; // 100MB default
 
         // Create output directory if it doesn't exist
-        std::fs::create_dir_all(&output_dir).map_err(|e| OtlpError::Io(e))?;
+        std::fs::create_dir_all(&output_dir).map_err(OtlpError::Io)?;
 
         info!(
             output_dir = %output_dir.display(),
@@ -88,8 +88,8 @@ impl OtlpFileExporter {
         // Create subdirectories for traces and metrics
         let traces_dir = output_dir.join("traces");
         let metrics_dir = output_dir.join("metrics");
-        std::fs::create_dir_all(&traces_dir).map_err(|e| OtlpError::Io(e))?;
-        std::fs::create_dir_all(&metrics_dir).map_err(|e| OtlpError::Io(e))?;
+        std::fs::create_dir_all(&traces_dir).map_err(OtlpError::Io)?;
+        std::fs::create_dir_all(&metrics_dir).map_err(OtlpError::Io)?;
 
         // Create forwarder if forwarding is enabled
         let forwarder = if let Some(ref forwarding_config) = config.forwarding {
@@ -167,30 +167,20 @@ impl OtlpFileExporter {
         if writer.current_size + data_size > self.max_file_size {
             writer
                 .rotate_file(&output_dir, "traces", self.format)
-                .map_err(|e| {
-                    OtlpError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    ))
-                })?;
+                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
         }
 
         // Open file if needed
         if writer.current_file.is_none() {
             writer
                 .open_new_file(&output_dir, "traces", self.format)
-                .map_err(|e| {
-                    OtlpError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    ))
-                })?;
+                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
         }
 
         // Write data
         if let Some(ref mut file) = writer.current_file {
-            file.write_all(&data).map_err(|e| OtlpError::Io(e))?;
-            file.flush().map_err(|e| OtlpError::Io(e))?;
+            file.write_all(&data).map_err(OtlpError::Io)?;
+            file.flush().map_err(OtlpError::Io)?;
             writer.current_size += data_size;
             trace!(
                 "Wrote {} spans ({} bytes) to trace file",
@@ -247,30 +237,20 @@ impl OtlpFileExporter {
         if writer.current_size + data_size > self.max_file_size {
             writer
                 .rotate_file(&output_dir, "metrics", self.format)
-                .map_err(|e| {
-                    OtlpError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    ))
-                })?;
+                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
         }
 
         // Open file if needed
         if writer.current_file.is_none() {
             writer
                 .open_new_file(&output_dir, "metrics", self.format)
-                .map_err(|e| {
-                    OtlpError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    ))
-                })?;
+                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
         }
 
         // Write data
         if let Some(ref mut file) = writer.current_file {
-            file.write_all(&data).map_err(|e| OtlpError::Io(e))?;
-            file.flush().map_err(|e| OtlpError::Io(e))?;
+            file.write_all(&data).map_err(OtlpError::Io)?;
+            file.flush().map_err(OtlpError::Io)?;
             writer.current_size += data_size;
             trace!("Wrote metrics ({} bytes) to file", data_size);
 
@@ -326,12 +306,12 @@ impl OtlpFileExporter {
     pub async fn flush(&self) -> Result<(), OtlpError> {
         let mut traces_writer = self.traces_writer.lock().await;
         if let Some(ref mut file) = traces_writer.current_file {
-            file.flush().map_err(|e| OtlpError::Io(e))?;
+            file.flush().map_err(OtlpError::Io)?;
         }
 
         let mut metrics_writer = self.metrics_writer.lock().await;
         if let Some(ref mut file) = metrics_writer.current_file {
-            file.flush().map_err(|e| OtlpError::Io(e))?;
+            file.flush().map_err(OtlpError::Io)?;
         }
 
         Ok(())
@@ -365,7 +345,7 @@ impl OtlpFileExporter {
                 ))
             })?;
 
-        let entries = std::fs::read_dir(dir).map_err(|e| OtlpError::Io(e))?;
+        let entries = std::fs::read_dir(dir).map_err(OtlpError::Io)?;
 
         let mut deleted_count = 0;
         let mut error_count = 0;
@@ -476,7 +456,6 @@ impl TracesWriter {
 
         let file = OpenOptions::new()
             .create(true)
-            .write(true)
             .append(true)
             .open(&file_path)
             .map_err(|e| {
@@ -522,7 +501,6 @@ impl MetricsWriter {
 
         let file = OpenOptions::new()
             .create(true)
-            .write(true)
             .append(true)
             .open(&file_path)
             .map_err(|e| {
@@ -697,6 +675,8 @@ fn convert_metrics_to_arrow_ipc(metrics: &ResourceMetrics) -> Result<Vec<u8>> {
     let metrics_debug = format!("{:?}", metrics);
 
     // Create a simple record with the debug string
+    // Note: Arrow arrays require Vec, not arrays, so we use vec! here
+    #[allow(clippy::useless_vec)]
     let metric_names = vec![Some("resource_metrics".to_string())];
     let values = vec![0.0]; // Placeholder
     let timestamps = vec![Some(
@@ -705,7 +685,9 @@ fn convert_metrics_to_arrow_ipc(metrics: &ResourceMetrics) -> Result<Vec<u8>> {
             .unwrap_or_default()
             .as_nanos() as u64,
     )];
+    #[allow(clippy::useless_vec)]
     let metric_types = vec![Some("debug".to_string())];
+    #[allow(clippy::useless_vec)]
     let attributes = vec![Some(metrics_debug)];
 
     // If no metrics, return empty batch
@@ -779,6 +761,7 @@ pub struct FileSpanExporter {
 }
 
 impl FileSpanExporter {
+    /// Create a new FileSpanExporter with the given file exporter
     pub fn new(file_exporter: Arc<OtlpFileExporter>) -> Self {
         Self { file_exporter }
     }
@@ -830,6 +813,7 @@ pub struct FileMetricExporter {
 }
 
 impl FileMetricExporter {
+    /// Create a new FileMetricExporter with the given file exporter
     pub fn new(file_exporter: Arc<OtlpFileExporter>) -> Self {
         Self { file_exporter }
     }

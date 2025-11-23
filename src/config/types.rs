@@ -9,19 +9,14 @@ use std::path::PathBuf;
 use crate::error::OtlpConfigError;
 
 /// Protocol to use for forwarding messages to remote endpoints
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ForwardingProtocol {
     /// Standard OTLP gRPC with Protobuf
+    #[default]
     Protobuf,
     /// OpenTelemetry Protocol with Apache Arrow (OTAP)
     ArrowFlight,
-}
-
-impl Default for ForwardingProtocol {
-    fn default() -> Self {
-        Self::Protobuf
-    }
 }
 
 /// Configuration for gRPC protocol support (Protobuf and Arrow Flight)
@@ -66,25 +61,26 @@ impl ProtocolConfig {
         }
 
         // Ports must be valid (1-65535)
-        if self.protobuf_port == 0 || self.protobuf_port > 65535 {
+        if self.protobuf_port == 0 {
             return Err(OtlpConfigError::ValidationFailed(
                 "Protobuf port must be between 1 and 65535".to_string(),
             ));
         }
 
-        if self.arrow_flight_port == 0 || self.arrow_flight_port > 65535 {
+        if self.arrow_flight_port == 0 {
             return Err(OtlpConfigError::ValidationFailed(
                 "Arrow Flight port must be between 1 and 65535".to_string(),
             ));
         }
 
         // Ports must be different if both protocols are enabled
-        if self.protobuf_enabled && self.arrow_flight_enabled {
-            if self.protobuf_port == self.arrow_flight_port {
-                return Err(OtlpConfigError::ValidationFailed(
-                    "Protobuf and Arrow Flight ports must be different when both protocols are enabled".to_string(),
-                ));
-            }
+        if self.protobuf_enabled
+            && self.arrow_flight_enabled
+            && self.protobuf_port == self.arrow_flight_port
+        {
+            return Err(OtlpConfigError::ValidationFailed(
+                "Protobuf and Arrow Flight ports must be different when both protocols are enabled".to_string(),
+            ));
         }
 
         Ok(())
@@ -302,7 +298,7 @@ impl Config {
 ///     authentication: None,
 /// };
 /// ```
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ForwardingConfig {
     /// Whether forwarding is enabled (default: false)
     #[serde(default)]
@@ -318,17 +314,6 @@ pub struct ForwardingConfig {
     /// Authentication configuration (optional)
     #[serde(default)]
     pub authentication: Option<AuthConfig>,
-}
-
-impl Default for ForwardingConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            endpoint_url: None,
-            protocol: ForwardingProtocol::default(),
-            authentication: None,
-        }
-    }
 }
 
 impl ForwardingConfig {

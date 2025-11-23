@@ -88,26 +88,23 @@ impl OtlpLibrary {
         config.validate().map_err(OtlpError::from)?;
 
         // Create output directories
-        std::fs::create_dir_all(&config.output_dir.join("otlp/traces")).map_err(|e| {
-            OtlpError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to create traces directory: {}", e),
-            ))
+        std::fs::create_dir_all(config.output_dir.join("otlp/traces")).map_err(|e| {
+            OtlpError::Io(std::io::Error::other(format!(
+                "Failed to create traces directory: {}",
+                e
+            )))
         })?;
 
-        std::fs::create_dir_all(&config.output_dir.join("otlp/metrics")).map_err(|e| {
-            OtlpError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to create metrics directory: {}", e),
-            ))
+        std::fs::create_dir_all(config.output_dir.join("otlp/metrics")).map_err(|e| {
+            OtlpError::Io(std::io::Error::other(format!(
+                "Failed to create metrics directory: {}",
+                e
+            )))
         })?;
 
         // Create file exporter
         let file_exporter = Arc::new(OtlpFileExporter::new(&config).map_err(|e| {
-            OtlpError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                e.to_string(),
-            ))
+            OtlpError::Io(std::io::Error::other(e.to_string()))
         })?);
 
         // Create batch buffer
@@ -421,5 +418,12 @@ impl OtlpLibrary {
 
         info!("OTLP library shutdown complete");
         Ok(())
+    }
+
+    /// Get a reference to the library's configuration
+    ///
+    /// Returns a read-only reference to the configuration used to initialize this library instance.
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 }

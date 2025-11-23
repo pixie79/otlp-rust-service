@@ -7,8 +7,7 @@ use opentelemetry::trace::{
     SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
 };
 use opentelemetry_sdk::trace::SpanData;
-use otlp_arrow_library::{Config, ConfigBuilder, OtlpLibrary};
-use std::path::PathBuf;
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary};
 use tempfile::TempDir;
 
 #[tokio::main]

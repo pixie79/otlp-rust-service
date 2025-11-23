@@ -11,3 +11,6 @@ cognitive-complexity-threshold = 50
 avoid-breaking-exported-api = false
 disallowed-methods = []
 disallowed-types = []
+
+# Allow non-local definitions for PyO3 bindings (known pyo3 macro limitation)
+# This is required because pyo3's #[pymethods] macro generates non-local impl blocks
