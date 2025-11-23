@@ -79,7 +79,8 @@ impl ProtocolConfig {
             && self.protobuf_port == self.arrow_flight_port
         {
             return Err(OtlpConfigError::ValidationFailed(
-                "Protobuf and Arrow Flight ports must be different when both protocols are enabled".to_string(),
+                "Protobuf and Arrow Flight ports must be different when both protocols are enabled"
+                    .to_string(),
             ));
         }
 

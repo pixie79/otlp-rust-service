@@ -103,9 +103,10 @@ impl OtlpLibrary {
         })?;
 
         // Create file exporter
-        let file_exporter = Arc::new(OtlpFileExporter::new(&config).map_err(|e| {
-            OtlpError::Io(std::io::Error::other(e.to_string()))
-        })?);
+        let file_exporter = Arc::new(
+            OtlpFileExporter::new(&config)
+                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?,
+        );
 
         // Create batch buffer
         let batch_buffer = Arc::new(BatchBuffer::new(config.write_interval_secs));

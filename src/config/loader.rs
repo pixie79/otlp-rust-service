@@ -298,10 +298,7 @@ impl ConfigLoader {
         // OTLP_FORWARDING_ENABLED
         if let Ok(enabled) = env::var("OTLP_FORWARDING_ENABLED") {
             if enabled.parse::<bool>().unwrap_or(false) {
-                let mut forwarding = config
-                    .forwarding
-                    .take()
-                    .unwrap_or_default();
+                let mut forwarding = config.forwarding.take().unwrap_or_default();
                 forwarding.enabled = true;
 
                 // OTLP_FORWARDING_ENDPOINT_URL
