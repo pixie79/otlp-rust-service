@@ -10,4 +10,3 @@ pub use loader::ConfigLoader;
 pub use types::{
     AuthConfig, Config, ConfigBuilder, ForwardingConfig, ForwardingProtocol, ProtocolConfig,
 };
-

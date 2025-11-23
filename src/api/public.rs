@@ -88,26 +88,27 @@ impl OtlpLibrary {
         config.validate().map_err(OtlpError::from)?;
 
         // Create output directories
-        std::fs::create_dir_all(&config.output_dir.join("otlp/traces"))
-            .map_err(|e| OtlpError::Io(std::io::Error::new(
+        std::fs::create_dir_all(&config.output_dir.join("otlp/traces")).map_err(|e| {
+            OtlpError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to create traces directory: {}", e),
-            )))?;
+            ))
+        })?;
 
-        std::fs::create_dir_all(&config.output_dir.join("otlp/metrics"))
-            .map_err(|e| OtlpError::Io(std::io::Error::new(
+        std::fs::create_dir_all(&config.output_dir.join("otlp/metrics")).map_err(|e| {
+            OtlpError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to create metrics directory: {}", e),
-            )))?;
+            ))
+        })?;
 
         // Create file exporter
-        let file_exporter = Arc::new(
-            OtlpFileExporter::new(&config)
-                .map_err(|e| OtlpError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                )))?
-        );
+        let file_exporter = Arc::new(OtlpFileExporter::new(&config).map_err(|e| {
+            OtlpError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                e.to_string(),
+            ))
+        })?);
 
         // Create batch buffer
         let batch_buffer = Arc::new(BatchBuffer::new(config.write_interval_secs));
@@ -121,7 +122,7 @@ impl OtlpLibrary {
             let mut interval_timer = interval(write_interval);
             loop {
                 interval_timer.tick().await;
-                
+
                 // Check if we should write
                 if batch_buffer_clone.should_write().await {
                     // Take buffered traces
@@ -157,7 +158,10 @@ impl OtlpLibrary {
             let mut interval_timer = interval(trace_cleanup_interval);
             loop {
                 interval_timer.tick().await;
-                if let Err(e) = file_exporter_traces_cleanup.cleanup_traces(config.trace_cleanup_interval_secs).await {
+                if let Err(e) = file_exporter_traces_cleanup
+                    .cleanup_traces(config.trace_cleanup_interval_secs)
+                    .await
+                {
                     warn!("Failed to cleanup trace files: {}", e);
                 }
             }
@@ -169,16 +173,25 @@ impl OtlpLibrary {
             let mut interval_timer = interval(metric_cleanup_interval);
             loop {
                 interval_timer.tick().await;
-                if let Err(e) = file_exporter_metrics_cleanup.cleanup_metrics(config.metric_cleanup_interval_secs).await {
+                if let Err(e) = file_exporter_metrics_cleanup
+                    .cleanup_metrics(config.metric_cleanup_interval_secs)
+                    .await
+                {
                     warn!("Failed to cleanup metric files: {}", e);
                 }
             }
         });
 
         // Store cleanup handles (we'll need to abort them on shutdown)
-        let cleanup_handles = Arc::new(Mutex::new(vec![trace_cleanup_handle, metric_cleanup_handle]));
+        let cleanup_handles = Arc::new(Mutex::new(vec![
+            trace_cleanup_handle,
+            metric_cleanup_handle,
+        ]));
 
-        info!("OTLP library initialized with output directory: {}", config.output_dir.display());
+        info!(
+            "OTLP library initialized with output directory: {}",
+            config.output_dir.display()
+        );
 
         Ok(Self {
             config,
@@ -237,7 +250,10 @@ impl OtlpLibrary {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn export_trace(&self, span: opentelemetry_sdk::trace::SpanData) -> Result<(), OtlpError> {
+    pub async fn export_trace(
+        &self,
+        span: opentelemetry_sdk::trace::SpanData,
+    ) -> Result<(), OtlpError> {
         self.batch_buffer.add_trace(span).await
     }
 
@@ -266,7 +282,10 @@ impl OtlpLibrary {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn export_traces(&self, spans: Vec<opentelemetry_sdk::trace::SpanData>) -> Result<(), OtlpError> {
+    pub async fn export_traces(
+        &self,
+        spans: Vec<opentelemetry_sdk::trace::SpanData>,
+    ) -> Result<(), OtlpError> {
         self.batch_buffer.add_traces(spans).await
     }
 
@@ -295,7 +314,10 @@ impl OtlpLibrary {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn export_metrics(&self, metrics: opentelemetry_sdk::metrics::data::ResourceMetrics) -> Result<(), OtlpError> {
+    pub async fn export_metrics(
+        &self,
+        metrics: opentelemetry_sdk::metrics::data::ResourceMetrics,
+    ) -> Result<(), OtlpError> {
         self.batch_buffer.add_metrics(metrics).await
     }
 
@@ -401,4 +423,3 @@ impl OtlpLibrary {
         Ok(())
     }
 }
-

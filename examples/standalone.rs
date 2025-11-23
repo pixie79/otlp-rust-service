@@ -3,8 +3,8 @@
 //! This example demonstrates how to run the OTLP library as a standalone service
 //! with gRPC servers for both Protobuf and Arrow Flight protocols.
 
+use otlp_arrow_library::otlp::{OtlpArrowFlightServer, OtlpGrpcServer};
 use otlp_arrow_library::{Config, OtlpLibrary};
-use otlp_arrow_library::otlp::{OtlpGrpcServer, OtlpArrowFlightServer};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio::signal;
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         trace_cleanup_interval_secs: 600,
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(), // Both Protobuf and Arrow Flight enabled
-        forwarding: None, // No forwarding by default
+        forwarding: None,              // No forwarding by default
     };
 
     // Create library instance (clone config since we need it later)
@@ -37,9 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let addr = format!("0.0.0.0:{}", config_clone.protocols.protobuf_port)
             .parse()
             .unwrap();
-        
+
         info!("Starting gRPC Protobuf server on {}", addr);
-        
+
         Some(tokio::spawn(async move {
             let server = OtlpGrpcServer::new(file_exporter_clone);
             if let Err(e) = server.start(addr).await {
@@ -56,9 +56,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let addr = format!("0.0.0.0:{}", config_clone.protocols.arrow_flight_port)
             .parse()
             .unwrap();
-        
+
         info!("Starting gRPC Arrow Flight server on {}", addr);
-        
+
         Some(tokio::spawn(async move {
             let server = OtlpArrowFlightServer::new(file_exporter_clone);
             if let Err(e) = server.start(addr).await {
@@ -89,4 +89,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Shutdown complete");
     Ok(())
 }
-

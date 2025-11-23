@@ -4,7 +4,9 @@
 
 use crate::api::public::OtlpLibrary;
 use crate::config::{Config, ConfigBuilder};
-use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
+use opentelemetry::trace::{
+    SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
+};
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::SpanData;
@@ -25,7 +27,7 @@ pub struct PyOtlpLibrary {
 #[pymethods]
 impl PyOtlpLibrary {
     /// Create a new OTLP library instance
-    /// 
+    ///
     /// Args:
     ///     output_dir: Optional output directory path (default: "./output_dir")
     ///     write_interval_secs: Optional write interval in seconds (default: 5)
@@ -75,17 +77,18 @@ impl PyOtlpLibrary {
             builder = builder.arrow_flight_port(port);
         }
 
-        let config = builder.build()
+        let config = builder
+            .build()
             .map_err(|e| PyRuntimeError::new_err(format!("Configuration error: {}", e)))?;
 
         Self::new_with_config(config)
     }
 
     /// Export a single trace span from a Python dictionary
-    /// 
+    ///
     /// Args:
     ///     span_dict: Dictionary with span data (trace_id, span_id, name, etc.)
-    /// 
+    ///
     /// Example:
     ///     library.export_trace({
     ///         "trace_id": bytes([1, 2, ...]),  # 16 bytes
@@ -97,14 +100,13 @@ impl PyOtlpLibrary {
     pub fn export_trace(&self, span_dict: &PyDict) -> PyResult<()> {
         let span = dict_to_span_data(span_dict)?;
         let library = self.library.clone();
-        self.runtime.block_on(async move {
-            library.export_trace(span).await
-        })
-        .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
+        self.runtime
+            .block_on(async move { library.export_trace(span).await })
+            .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
     }
 
     /// Export multiple trace spans from a Python list of dictionaries
-    /// 
+    ///
     /// Args:
     ///     spans: List of dictionaries, each containing span data
     pub fn export_traces(&self, spans: &PyList) -> PyResult<()> {
@@ -113,47 +115,43 @@ impl PyOtlpLibrary {
             let dict = item.downcast::<PyDict>()?;
             span_data_vec.push(dict_to_span_data(dict)?);
         }
-        
+
         let library = self.library.clone();
-        self.runtime.block_on(async move {
-            library.export_traces(span_data_vec).await
-        })
-        .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
+        self.runtime
+            .block_on(async move { library.export_traces(span_data_vec).await })
+            .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
     }
 
     /// Export metrics from a Python dictionary
-    /// 
+    ///
     /// Args:
     ///     metrics_dict: Dictionary with metrics data
-    /// 
+    ///
     /// Note: Full metrics conversion is complex. This creates a minimal ResourceMetrics.
     pub fn export_metrics(&self, _metrics_dict: &PyDict) -> PyResult<()> {
         // Create a minimal ResourceMetrics
         // Full implementation would parse the dict and create proper metrics
         let metrics = ResourceMetrics::default();
         let library = self.library.clone();
-        self.runtime.block_on(async move {
-            library.export_metrics(metrics).await
-        })
-        .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
+        self.runtime
+            .block_on(async move { library.export_metrics(metrics).await })
+            .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
     }
 
     /// Force immediate flush of all buffered messages to disk
     pub fn flush(&self) -> PyResult<()> {
         let library = self.library.clone();
-        self.runtime.block_on(async move {
-            library.flush().await
-        })
-        .map_err(|e| PyRuntimeError::new_err(format!("Flush error: {}", e)))
+        self.runtime
+            .block_on(async move { library.flush().await })
+            .map_err(|e| PyRuntimeError::new_err(format!("Flush error: {}", e)))
     }
 
     /// Gracefully shut down the library, flushing all pending writes
     pub fn shutdown(&self) -> PyResult<()> {
         let library = self.library.clone();
-        self.runtime.block_on(async move {
-            library.shutdown().await
-        })
-        .map_err(|e| PyRuntimeError::new_err(format!("Shutdown error: {}", e)))
+        self.runtime
+            .block_on(async move { library.shutdown().await })
+            .map_err(|e| PyRuntimeError::new_err(format!("Shutdown error: {}", e)))
     }
 }
 
@@ -165,10 +163,9 @@ impl PyOtlpLibrary {
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create runtime: {}", e)))?;
 
         // Create the library instance
-        let library = runtime.block_on(async {
-            OtlpLibrary::new(config).await
-        })
-        .map_err(|e| PyRuntimeError::new_err(format!("Failed to create library: {}", e)))?;
+        let library = runtime
+            .block_on(async { OtlpLibrary::new(config).await })
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create library: {}", e)))?;
 
         Ok(Self {
             library: Arc::new(library),
@@ -180,50 +177,66 @@ impl PyOtlpLibrary {
 /// Convert Python dictionary to SpanData
 fn dict_to_span_data(dict: &PyDict) -> PyResult<SpanData> {
     // Extract trace_id (16 bytes)
-    let trace_id_obj = dict.get_item("trace_id")?
+    let trace_id_obj = dict
+        .get_item("trace_id")?
         .ok_or_else(|| PyRuntimeError::new_err("Missing 'trace_id' in span dict"))?;
-    let trace_id_bytes = trace_id_obj.downcast::<pyo3::types::PyBytes>()?
-        .as_bytes();
-    
+    let trace_id_bytes = trace_id_obj.downcast::<pyo3::types::PyBytes>()?.as_bytes();
+
     if trace_id_bytes.len() != 16 {
         return Err(PyRuntimeError::new_err("trace_id must be exactly 16 bytes"));
     }
-    
+
     let trace_id = TraceId::from_bytes([
-        trace_id_bytes[0], trace_id_bytes[1], trace_id_bytes[2], trace_id_bytes[3],
-        trace_id_bytes[4], trace_id_bytes[5], trace_id_bytes[6], trace_id_bytes[7],
-        trace_id_bytes[8], trace_id_bytes[9], trace_id_bytes[10], trace_id_bytes[11],
-        trace_id_bytes[12], trace_id_bytes[13], trace_id_bytes[14], trace_id_bytes[15],
+        trace_id_bytes[0],
+        trace_id_bytes[1],
+        trace_id_bytes[2],
+        trace_id_bytes[3],
+        trace_id_bytes[4],
+        trace_id_bytes[5],
+        trace_id_bytes[6],
+        trace_id_bytes[7],
+        trace_id_bytes[8],
+        trace_id_bytes[9],
+        trace_id_bytes[10],
+        trace_id_bytes[11],
+        trace_id_bytes[12],
+        trace_id_bytes[13],
+        trace_id_bytes[14],
+        trace_id_bytes[15],
     ]);
 
     // Extract span_id (8 bytes)
-    let span_id_obj = dict.get_item("span_id")?
+    let span_id_obj = dict
+        .get_item("span_id")?
         .ok_or_else(|| PyRuntimeError::new_err("Missing 'span_id' in span dict"))?;
-    let span_id_bytes = span_id_obj.downcast::<pyo3::types::PyBytes>()?
-        .as_bytes();
-    
+    let span_id_bytes = span_id_obj.downcast::<pyo3::types::PyBytes>()?.as_bytes();
+
     if span_id_bytes.len() != 8 {
         return Err(PyRuntimeError::new_err("span_id must be exactly 8 bytes"));
     }
-    
+
     let span_id = SpanId::from_bytes([
-        span_id_bytes[0], span_id_bytes[1], span_id_bytes[2], span_id_bytes[3],
-        span_id_bytes[4], span_id_bytes[5], span_id_bytes[6], span_id_bytes[7],
+        span_id_bytes[0],
+        span_id_bytes[1],
+        span_id_bytes[2],
+        span_id_bytes[3],
+        span_id_bytes[4],
+        span_id_bytes[5],
+        span_id_bytes[6],
+        span_id_bytes[7],
     ]);
 
     // Extract parent_span_id (optional, 8 bytes)
-    let parent_span_id = dict.get_item("parent_span_id")
+    let parent_span_id = dict
+        .get_item("parent_span_id")
         .ok()
         .flatten()
-        .and_then(|parent_bytes_obj| {
-            parent_bytes_obj.downcast::<pyo3::types::PyBytes>().ok()
-        })
+        .and_then(|parent_bytes_obj| parent_bytes_obj.downcast::<pyo3::types::PyBytes>().ok())
         .map(|parent_bytes| {
             let bytes = parent_bytes.as_bytes();
             if bytes.len() == 8 {
                 SpanId::from_bytes([
-                    bytes[0], bytes[1], bytes[2], bytes[3],
-                    bytes[4], bytes[5], bytes[6], bytes[7],
+                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
                 ])
             } else {
                 SpanId::INVALID
@@ -232,12 +245,14 @@ fn dict_to_span_data(dict: &PyDict) -> PyResult<SpanData> {
         .unwrap_or(SpanId::INVALID);
 
     // Extract name
-    let name = dict.get_item("name")?
+    let name = dict
+        .get_item("name")?
         .ok_or_else(|| PyRuntimeError::new_err("Missing 'name' in span dict"))?
         .extract::<String>()?;
 
     // Extract kind (default to Internal)
-    let span_kind = dict.get_item("kind")
+    let span_kind = dict
+        .get_item("kind")
         .ok()
         .flatten()
         .and_then(|k| k.extract::<String>().ok())
@@ -251,12 +266,14 @@ fn dict_to_span_data(dict: &PyDict) -> PyResult<SpanData> {
         .unwrap_or(SpanKind::Internal);
 
     // Extract attributes (optional)
-    let attributes: Vec<KeyValue> = dict.get_item("attributes")
+    let attributes: Vec<KeyValue> = dict
+        .get_item("attributes")
         .ok()
         .flatten()
         .and_then(|attrs| attrs.downcast::<PyDict>().ok())
         .map(|attrs_dict| {
-            attrs_dict.iter()
+            attrs_dict
+                .iter()
                 .filter_map(|(key, value)| {
                     let key_str = key.extract::<String>().ok()?;
                     let value = match value.extract::<String>() {
@@ -267,7 +284,9 @@ fn dict_to_span_data(dict: &PyDict) -> PyResult<SpanData> {
                                 Ok(f) => opentelemetry::Value::F64(f),
                                 Err(_) => match value.extract::<bool>() {
                                     Ok(b) => opentelemetry::Value::Bool(b),
-                                    Err(_) => opentelemetry::Value::String(value.to_string().into()),
+                                    Err(_) => {
+                                        opentelemetry::Value::String(value.to_string().into())
+                                    }
                                 },
                             },
                         },
@@ -283,13 +302,15 @@ fn dict_to_span_data(dict: &PyDict) -> PyResult<SpanData> {
     let end_time = SystemTime::now();
 
     // Extract status (optional, default to Ok)
-    let status = dict.get_item("status")
+    let status = dict
+        .get_item("status")
         .ok()
         .flatten()
         .and_then(|s| s.extract::<String>().ok())
         .map(|s| match s.to_lowercase().as_str() {
             "error" => Status::Error {
-                description: dict.get_item("status_message")
+                description: dict
+                    .get_item("status_message")
                     .ok()
                     .flatten()
                     .and_then(|m| m.extract::<String>().ok())
@@ -301,10 +322,15 @@ fn dict_to_span_data(dict: &PyDict) -> PyResult<SpanData> {
         })
         .unwrap_or(Status::Ok);
 
-    let span_context = SpanContext::new(trace_id, span_id, TraceFlags::default(), false, TraceState::default());
-    
-    let instrumentation_scope = opentelemetry::InstrumentationScope::builder("python")
-        .build();
+    let span_context = SpanContext::new(
+        trace_id,
+        span_id,
+        TraceFlags::default(),
+        false,
+        TraceState::default(),
+    );
+
+    let instrumentation_scope = opentelemetry::InstrumentationScope::builder("python").build();
 
     Ok(SpanData {
         span_context,

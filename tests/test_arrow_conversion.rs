@@ -1,6 +1,8 @@
 //! Unit tests for Arrow IPC conversion functions
 
-use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
+use opentelemetry::trace::{
+    SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
+};
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::SpanData;
 use std::time::{Duration, SystemTime};
@@ -10,9 +12,15 @@ fn create_test_span(name: &str) -> SpanData {
     let trace_id = TraceId::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     let span_id = SpanId::from_bytes([1, 2, 3, 4, 5, 6, 7, 8]);
     let parent_span_id = SpanId::from_bytes([9, 10, 11, 12, 13, 14, 15, 16]);
-    
-    let span_context = SpanContext::new(trace_id, span_id, TraceFlags::default(), false, TraceState::default());
-    
+
+    let span_context = SpanContext::new(
+        trace_id,
+        span_id,
+        TraceFlags::default(),
+        false,
+        TraceState::default(),
+    );
+
     SpanData {
         span_context,
         parent_span_id,
@@ -65,48 +73,70 @@ async fn test_arrow_ipc_conversion_traces() {
 
     // Export traces (this internally uses the conversion function)
     let result = exporter.export_traces(spans.clone()).await;
-    assert!(result.is_ok(), "Failed to export traces: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to export traces: {:?}",
+        result.err()
+    );
 
     // Verify file was created
     let traces_dir = temp_dir.path().join("otlp/traces");
     assert!(traces_dir.exists(), "Traces directory should exist");
-    
+
     // Check that at least one arrow file was created
     let files: Vec<_> = std::fs::read_dir(&traces_dir)
         .unwrap()
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
-            entry.path().extension()
+            entry
+                .path()
+                .extension()
                 .and_then(|ext| ext.to_str())
                 .map(|ext| ext == "arrow")
                 .unwrap_or(false)
         })
         .collect();
-    
-    assert!(!files.is_empty(), "At least one arrow file should be created");
-    
+
+    assert!(
+        !files.is_empty(),
+        "At least one arrow file should be created"
+    );
+
     // Verify the file is readable as Arrow IPC
     use arrow::ipc::reader::StreamReader;
     use std::fs::File;
-    
+
     let arrow_file = File::open(&files[0].path()).unwrap();
     let reader = StreamReader::try_new(arrow_file, None).unwrap();
-    
+
     let mut batch_count = 0;
     for batch_result in reader {
         let batch = batch_result.unwrap();
         batch_count += 1;
-        
+
         // Verify schema has expected fields
         let schema = batch.schema();
-        assert!(schema.field_with_name("trace_id").is_ok(), "Schema should have trace_id field");
-        assert!(schema.field_with_name("span_id").is_ok(), "Schema should have span_id field");
-        assert!(schema.field_with_name("name").is_ok(), "Schema should have name field");
-        
+        assert!(
+            schema.field_with_name("trace_id").is_ok(),
+            "Schema should have trace_id field"
+        );
+        assert!(
+            schema.field_with_name("span_id").is_ok(),
+            "Schema should have span_id field"
+        );
+        assert!(
+            schema.field_with_name("name").is_ok(),
+            "Schema should have name field"
+        );
+
         // Verify we have the expected number of rows
-        assert_eq!(batch.num_rows(), spans.len(), "Batch should have correct number of rows");
+        assert_eq!(
+            batch.num_rows(),
+            spans.len(),
+            "Batch should have correct number of rows"
+        );
     }
-    
+
     assert!(batch_count > 0, "Should have at least one batch");
 }
 

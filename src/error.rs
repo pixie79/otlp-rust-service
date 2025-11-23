@@ -101,4 +101,3 @@ impl From<anyhow::Error> for OtlpError {
         ))
     }
 }
-

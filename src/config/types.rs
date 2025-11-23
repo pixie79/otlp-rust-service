@@ -129,23 +129,23 @@ fn default_arrow_flight_port() -> u16 {
 /// - `protocols`: Both Protobuf and Arrow Flight enabled by default
 /// - `forwarding`: Disabled by default
 ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use otlp_arrow_library::Config;
-    ///
-    /// // Use defaults
-    /// let config = Config::default();
-    ///
-    /// // Or use builder
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = otlp_arrow_library::ConfigBuilder::new()
-    ///     .output_dir("./custom_output")
-    ///     .write_interval_secs(10)
-    ///     .build()?;
-    /// # Ok(())
-    /// # }
-    /// ```
+/// # Example
+///
+/// ```no_run
+/// use otlp_arrow_library::Config;
+///
+/// // Use defaults
+/// let config = Config::default();
+///
+/// // Or use builder
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let config = otlp_arrow_library::ConfigBuilder::new()
+///     .output_dir("./custom_output")
+///     .write_interval_secs(10)
+///     .build()?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// Output directory for Arrow IPC files (default: ./output_dir)
@@ -199,9 +199,10 @@ impl Config {
         // Validate path is not too long (platform-specific, but 4096 is safe for most)
         let path_str = self.output_dir.to_string_lossy();
         if path_str.len() > 4096 {
-            return Err(OtlpConfigError::InvalidOutputDir(
-                format!("Output directory path is too long ({} characters, max 4096)", path_str.len()),
-            ));
+            return Err(OtlpConfigError::InvalidOutputDir(format!(
+                "Output directory path is too long ({} characters, max 4096)",
+                path_str.len()
+            )));
         }
 
         // Validate path doesn't contain null bytes (invalid on most systems)
@@ -289,10 +290,10 @@ impl Config {
 /// - **Resilience**: Forwarding failures do not affect local storage
 /// - **Circuit Breaker**: Automatically stops forwarding after repeated failures
 ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use otlp_arrow_library::config::{ForwardingConfig, ForwardingProtocol};
+/// # Example
+///
+/// ```no_run
+/// use otlp_arrow_library::config::{ForwardingConfig, ForwardingProtocol};
 ///
 /// let forwarding = ForwardingConfig {
 ///     enabled: true,
@@ -410,23 +411,29 @@ impl AuthConfig {
         // Validate required credentials based on auth type
         match self.auth_type.as_str() {
             "api_key" | "bearer_token" => {
-                if !self.credentials.contains_key("token") && !self.credentials.contains_key("api_key") {
-                    return Err(OtlpConfigError::MissingRequiredField(
-                        format!("token or api_key required for {}", self.auth_type),
-                    ));
+                if !self.credentials.contains_key("token")
+                    && !self.credentials.contains_key("api_key")
+                {
+                    return Err(OtlpConfigError::MissingRequiredField(format!(
+                        "token or api_key required for {}",
+                        self.auth_type
+                    )));
                 }
             }
             "basic" => {
-                if !self.credentials.contains_key("username") || !self.credentials.contains_key("password") {
+                if !self.credentials.contains_key("username")
+                    || !self.credentials.contains_key("password")
+                {
                     return Err(OtlpConfigError::MissingRequiredField(
                         "username and password required for basic auth".to_string(),
                     ));
                 }
             }
             _ => {
-                return Err(OtlpConfigError::ValidationFailed(
-                    format!("Unsupported authentication type: {}", self.auth_type),
-                ));
+                return Err(OtlpConfigError::ValidationFailed(format!(
+                    "Unsupported authentication type: {}",
+                    self.auth_type
+                )));
             }
         }
 
@@ -537,4 +544,3 @@ fn default_trace_cleanup_interval_secs() -> u64 {
 fn default_metric_cleanup_interval_secs() -> u64 {
     3600
 }
-

@@ -40,8 +40,8 @@ pub mod python;
 
 // Re-export public API
 pub use api::public::OtlpLibrary;
-pub use config::{Config, ConfigBuilder, ForwardingConfig, ForwardingProtocol, AuthConfig};
-pub use error::{OtlpError, OtlpConfigError, OtlpExportError, OtlpServerError};
+pub use config::{AuthConfig, Config, ConfigBuilder, ForwardingConfig, ForwardingProtocol};
+pub use error::{OtlpConfigError, OtlpError, OtlpExportError, OtlpServerError};
 pub use mock::service::MockOtlpService;
 
 // Initialize tracing subscriber for structured logging
@@ -68,4 +68,3 @@ mod tests {
         assert!(true);
     }
 }
-

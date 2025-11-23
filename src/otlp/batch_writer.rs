@@ -96,4 +96,3 @@ impl BatchBuffer {
         metrics.len()
     }
 }
-

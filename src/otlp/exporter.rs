@@ -10,6 +10,8 @@ use anyhow::Result;
 use arrow::array::*;
 use arrow::datatypes::*;
 use arrow::ipc::writer::StreamWriter;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::{SpanData, SpanExporter};
 use std::fs::{File, OpenOptions};
@@ -18,8 +20,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{info, trace, warn};
-use futures::future::BoxFuture;
-use futures::FutureExt;
 
 /// Export format for OTLP data
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,8 +77,7 @@ impl OtlpFileExporter {
         let max_file_size = 100 * 1024 * 1024; // 100MB default
 
         // Create output directory if it doesn't exist
-        std::fs::create_dir_all(&output_dir)
-            .map_err(|e| OtlpError::Io(e))?;
+        std::fs::create_dir_all(&output_dir).map_err(|e| OtlpError::Io(e))?;
 
         info!(
             output_dir = %output_dir.display(),
@@ -89,17 +88,21 @@ impl OtlpFileExporter {
         // Create subdirectories for traces and metrics
         let traces_dir = output_dir.join("traces");
         let metrics_dir = output_dir.join("metrics");
-        std::fs::create_dir_all(&traces_dir)
-            .map_err(|e| OtlpError::Io(e))?;
-        std::fs::create_dir_all(&metrics_dir)
-            .map_err(|e| OtlpError::Io(e))?;
+        std::fs::create_dir_all(&traces_dir).map_err(|e| OtlpError::Io(e))?;
+        std::fs::create_dir_all(&metrics_dir).map_err(|e| OtlpError::Io(e))?;
 
         // Create forwarder if forwarding is enabled
         let forwarder = if let Some(ref forwarding_config) = config.forwarding {
             if forwarding_config.enabled {
                 match crate::otlp::forwarder::OtlpForwarder::new(forwarding_config.clone()) {
                     Ok(f) => {
-                        info!("Forwarding enabled to {}", forwarding_config.endpoint_url.as_ref().unwrap_or(&"unknown".to_string()));
+                        info!(
+                            "Forwarding enabled to {}",
+                            forwarding_config
+                                .endpoint_url
+                                .as_ref()
+                                .unwrap_or(&"unknown".to_string())
+                        );
                         Some(Arc::new(f))
                     }
                     Err(e) => {
@@ -162,31 +165,39 @@ impl OtlpFileExporter {
 
         // Check if we need to rotate
         if writer.current_size + data_size > self.max_file_size {
-            writer.rotate_file(&output_dir, "traces", self.format)
-                .map_err(|e| OtlpError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                )))?;
+            writer
+                .rotate_file(&output_dir, "traces", self.format)
+                .map_err(|e| {
+                    OtlpError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string(),
+                    ))
+                })?;
         }
 
         // Open file if needed
         if writer.current_file.is_none() {
-            writer.open_new_file(&output_dir, "traces", self.format)
-                .map_err(|e| OtlpError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                )))?;
+            writer
+                .open_new_file(&output_dir, "traces", self.format)
+                .map_err(|e| {
+                    OtlpError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string(),
+                    ))
+                })?;
         }
 
         // Write data
         if let Some(ref mut file) = writer.current_file {
-            file.write_all(&data)
-                .map_err(|e| OtlpError::Io(e))?;
-            file.flush()
-                .map_err(|e| OtlpError::Io(e))?;
+            file.write_all(&data).map_err(|e| OtlpError::Io(e))?;
+            file.flush().map_err(|e| OtlpError::Io(e))?;
             writer.current_size += data_size;
-            trace!("Wrote {} spans ({} bytes) to trace file", spans.len(), data_size);
-            
+            trace!(
+                "Wrote {} spans ({} bytes) to trace file",
+                spans.len(),
+                data_size
+            );
+
             // Update metrics
             {
                 let mut count = self.files_written.lock().await;
@@ -234,31 +245,35 @@ impl OtlpFileExporter {
 
         // Check if we need to rotate
         if writer.current_size + data_size > self.max_file_size {
-            writer.rotate_file(&output_dir, "metrics", self.format)
-                .map_err(|e| OtlpError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                )))?;
+            writer
+                .rotate_file(&output_dir, "metrics", self.format)
+                .map_err(|e| {
+                    OtlpError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string(),
+                    ))
+                })?;
         }
 
         // Open file if needed
         if writer.current_file.is_none() {
-            writer.open_new_file(&output_dir, "metrics", self.format)
-                .map_err(|e| OtlpError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                )))?;
+            writer
+                .open_new_file(&output_dir, "metrics", self.format)
+                .map_err(|e| {
+                    OtlpError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string(),
+                    ))
+                })?;
         }
 
         // Write data
         if let Some(ref mut file) = writer.current_file {
-            file.write_all(&data)
-                .map_err(|e| OtlpError::Io(e))?;
-            file.flush()
-                .map_err(|e| OtlpError::Io(e))?;
+            file.write_all(&data).map_err(|e| OtlpError::Io(e))?;
+            file.flush().map_err(|e| OtlpError::Io(e))?;
             writer.current_size += data_size;
             trace!("Wrote metrics ({} bytes) to file", data_size);
-            
+
             // Update metrics
             {
                 let mut count = self.files_written.lock().await;
@@ -344,12 +359,13 @@ impl OtlpFileExporter {
 
         let cutoff_time = SystemTime::now()
             .checked_sub(Duration::from_secs(cleanup_interval_secs))
-            .ok_or_else(|| OtlpError::Export(OtlpExportError::CleanupError(
-                "Invalid cleanup interval".to_string(),
-            )))?;
+            .ok_or_else(|| {
+                OtlpError::Export(OtlpExportError::CleanupError(
+                    "Invalid cleanup interval".to_string(),
+                ))
+            })?;
 
-        let entries = std::fs::read_dir(dir)
-            .map_err(|e| OtlpError::Io(e))?;
+        let entries = std::fs::read_dir(dir).map_err(|e| OtlpError::Io(e))?;
 
         let mut deleted_count = 0;
         let mut error_count = 0;
@@ -365,7 +381,7 @@ impl OtlpFileExporter {
             };
 
             let path = entry.path();
-            
+
             // Only process files, not directories
             if !path.is_file() {
                 continue;
@@ -389,7 +405,11 @@ impl OtlpFileExporter {
             let modified = match metadata.modified() {
                 Ok(m) => m,
                 Err(e) => {
-                    warn!("Failed to get modification time for {}: {}", path.display(), e);
+                    warn!(
+                        "Failed to get modification time for {}: {}",
+                        path.display(),
+                        e
+                    );
                     error_count += 1;
                     continue;
                 }
@@ -440,10 +460,18 @@ impl OtlpFileExporter {
 }
 
 impl TracesWriter {
-    fn open_new_file(&mut self, output_dir: &Path, prefix: &str, _format: ExportFormat) -> Result<()> {
+    fn open_new_file(
+        &mut self,
+        output_dir: &Path,
+        prefix: &str,
+        _format: ExportFormat,
+    ) -> Result<()> {
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let extension = "arrow";
-        let filename = format!("otlp_{}_{}_{:04}.{}", prefix, timestamp, self.sequence, extension);
+        let filename = format!(
+            "otlp_{}_{}_{:04}.{}",
+            prefix, timestamp, self.sequence, extension
+        );
         let file_path = output_dir.join(&filename);
 
         let file = OpenOptions::new()
@@ -451,7 +479,9 @@ impl TracesWriter {
             .write(true)
             .append(true)
             .open(&file_path)
-            .map_err(|e| anyhow::anyhow!("Failed to create OTLP file {}: {}", file_path.display(), e))?;
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to create OTLP file {}: {}", file_path.display(), e)
+            })?;
 
         self.current_file = Some(file);
         self.current_size = 0;
@@ -476,10 +506,18 @@ impl TracesWriter {
 }
 
 impl MetricsWriter {
-    fn open_new_file(&mut self, output_dir: &Path, prefix: &str, _format: ExportFormat) -> Result<()> {
+    fn open_new_file(
+        &mut self,
+        output_dir: &Path,
+        prefix: &str,
+        _format: ExportFormat,
+    ) -> Result<()> {
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let extension = "arrow";
-        let filename = format!("otlp_{}_{}_{:04}.{}", prefix, timestamp, self.sequence, extension);
+        let filename = format!(
+            "otlp_{}_{}_{:04}.{}",
+            prefix, timestamp, self.sequence, extension
+        );
         let file_path = output_dir.join(&filename);
 
         let file = OpenOptions::new()
@@ -487,7 +525,9 @@ impl MetricsWriter {
             .write(true)
             .append(true)
             .open(&file_path)
-            .map_err(|e| anyhow::anyhow!("Failed to create OTLP file {}: {}", file_path.display(), e))?;
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to create OTLP file {}: {}", file_path.display(), e)
+            })?;
 
         self.current_file = Some(file);
         self.current_size = 0;
@@ -557,10 +597,20 @@ fn convert_spans_to_arrow_ipc(spans: &[SpanData]) -> Result<Vec<u8>> {
         });
         names.push(Some(span_data.name.clone()));
         kinds.push(span_data.span_kind.clone() as i32);
-        start_times.push(span_data.start_time.duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default().as_nanos() as u64);
-        end_times.push(span_data.end_time.duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default().as_nanos() as u64);
+        start_times.push(
+            span_data
+                .start_time
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64,
+        );
+        end_times.push(
+            span_data
+                .end_time
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64,
+        );
         use opentelemetry::trace::Status as OtelStatus;
         status_codes.push(match span_data.status {
             OtelStatus::Unset => 0,
@@ -575,7 +625,9 @@ fn convert_spans_to_arrow_ipc(spans: &[SpanData]) -> Result<Vec<u8>> {
             let key = kv.key.as_str();
             let json_value = match &kv.value {
                 opentelemetry::Value::I64(i) => serde_json::Value::Number((*i).into()),
-                opentelemetry::Value::F64(f) => serde_json::Value::Number(serde_json::Number::from_f64(*f).unwrap_or(serde_json::Number::from(0))),
+                opentelemetry::Value::F64(f) => serde_json::Value::Number(
+                    serde_json::Number::from_f64(*f).unwrap_or(serde_json::Number::from(0)),
+                ),
                 opentelemetry::Value::Bool(b) => serde_json::Value::Bool(*b),
                 opentelemetry::Value::String(s) => serde_json::Value::String(s.to_string()),
                 _ => serde_json::Value::String(format!("{:?}", kv.value)),
@@ -589,8 +641,12 @@ fn convert_spans_to_arrow_ipc(spans: &[SpanData]) -> Result<Vec<u8>> {
     // Build Arrow arrays
     let trace_id_refs: Vec<Option<&[u8]>> = trace_ids.iter().map(|opt| opt.as_deref()).collect();
     let span_id_refs: Vec<Option<&[u8]>> = span_ids.iter().map(|opt| opt.as_deref()).collect();
-    let parent_span_id_refs: Vec<Option<&[u8]>> = parent_span_ids.iter().map(|opt| opt.as_deref()).collect();
-    let name_refs: Vec<Option<&str>> = names.iter().map(|opt| opt.as_ref().map(|s| s.as_ref())).collect();
+    let parent_span_id_refs: Vec<Option<&[u8]>> =
+        parent_span_ids.iter().map(|opt| opt.as_deref()).collect();
+    let name_refs: Vec<Option<&str>> = names
+        .iter()
+        .map(|opt| opt.as_ref().map(|s| s.as_ref()))
+        .collect();
 
     let trace_id_array = Arc::new(BinaryArray::from(trace_id_refs));
     let span_id_array = Arc::new(BinaryArray::from(span_id_refs));
@@ -647,7 +703,7 @@ fn convert_metrics_to_arrow_ipc(metrics: &ResourceMetrics) -> Result<Vec<u8>> {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_nanos() as u64
+            .as_nanos() as u64,
     )];
     let metric_types = vec![Some("debug".to_string())];
     let attributes = vec![Some(metrics_debug)];
@@ -730,7 +786,10 @@ impl FileSpanExporter {
 
 impl SpanExporter for FileSpanExporter {
     #[allow(refining_impl_trait_reachable)]
-    fn export(&self, batch: Vec<SpanData>) -> BoxFuture<'static, opentelemetry_sdk::error::OTelSdkResult> {
+    fn export(
+        &self,
+        batch: Vec<SpanData>,
+    ) -> BoxFuture<'static, opentelemetry_sdk::error::OTelSdkResult> {
         let file_exporter = self.file_exporter.clone();
 
         async move {
@@ -739,10 +798,13 @@ impl SpanExporter for FileSpanExporter {
                 Ok(()) => Ok(()),
                 Err(e) => {
                     warn!("Failed to export traces to file: {}", e);
-                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string()))
+                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                        e.to_string(),
+                    ))
                 }
             }
-        }.boxed()
+        }
+        .boxed()
     }
 
     fn shutdown(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {
@@ -750,8 +812,9 @@ impl SpanExporter for FileSpanExporter {
         // Try to get current runtime handle
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.block_on(async {
-                self.file_exporter.flush().await
-                    .map_err(|e| opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string()))
+                self.file_exporter.flush().await.map_err(|e| {
+                    opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string())
+                })
             })
         } else {
             // No runtime available, can't flush
@@ -773,7 +836,10 @@ impl FileMetricExporter {
 }
 
 impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for FileMetricExporter {
-    fn export(&self, metrics: &ResourceMetrics) -> impl std::future::Future<Output = opentelemetry_sdk::error::OTelSdkResult> + Send {
+    fn export(
+        &self,
+        metrics: &ResourceMetrics,
+    ) -> impl std::future::Future<Output = opentelemetry_sdk::error::OTelSdkResult> + Send {
         let file_exporter = self.file_exporter.clone();
 
         async move {
@@ -782,7 +848,9 @@ impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for FileMetricExpo
                 Ok(()) => Ok(()),
                 Err(e) => {
                     warn!("Failed to export metrics to file: {}", e);
-                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string()))
+                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                        e.to_string(),
+                    ))
                 }
             }
         }
@@ -791,15 +859,19 @@ impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for FileMetricExpo
     fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.block_on(async {
-                self.file_exporter.flush().await
-                    .map_err(|e| opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string()))
+                self.file_exporter.flush().await.map_err(|e| {
+                    opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string())
+                })
             })
         } else {
             Ok(())
         }
     }
 
-    fn shutdown_with_timeout(&self, _timeout: std::time::Duration) -> opentelemetry_sdk::error::OTelSdkResult {
+    fn shutdown_with_timeout(
+        &self,
+        _timeout: std::time::Duration,
+    ) -> opentelemetry_sdk::error::OTelSdkResult {
         self.force_flush()
     }
 
@@ -807,4 +879,3 @@ impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for FileMetricExpo
         opentelemetry_sdk::metrics::Temporality::Cumulative
     }
 }
-

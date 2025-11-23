@@ -28,9 +28,7 @@ pub struct OtlpArrowFlightServer {
 impl OtlpArrowFlightServer {
     /// Create a new Arrow Flight server
     pub fn new(file_exporter: Arc<OtlpFileExporter>) -> Self {
-        Self {
-            file_exporter,
-        }
+        Self { file_exporter }
     }
 
     /// Start the Arrow Flight server on the specified address
@@ -42,14 +40,17 @@ impl OtlpArrowFlightServer {
         };
 
         let svc = FlightServiceServer::new(service);
-        
+
         tonic::transport::Server::builder()
             .add_service(svc)
             .serve(addr)
             .await
-            .map_err(|e| OtlpError::Server(crate::error::OtlpServerError::StartupError(
-                format!("Failed to start Arrow Flight server: {}", e)
-            )))?;
+            .map_err(|e| {
+                OtlpError::Server(crate::error::OtlpServerError::StartupError(format!(
+                    "Failed to start Arrow Flight server: {}",
+                    e
+                )))
+            })?;
 
         Ok(())
     }
@@ -110,7 +111,9 @@ impl FlightService for OtlpFlightServiceImpl {
         &self,
         _request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
-        Err(Status::unimplemented("DoGet not implemented - this is a receiver-only service"))
+        Err(Status::unimplemented(
+            "DoGet not implemented - this is a receiver-only service",
+        ))
     }
 
     async fn do_put(
@@ -119,11 +122,11 @@ impl FlightService for OtlpFlightServiceImpl {
     ) -> Result<Response<Self::DoPutStream>, Status> {
         let mut stream = request.into_inner();
         let file_exporter = self.file_exporter.clone();
-        
+
         // Process incoming Arrow Flight data stream
         tokio::spawn(async move {
             let mut batches = Vec::new();
-            
+
             while let Some(flight_data) = stream.next().await {
                 match flight_data {
                     Ok(data) => {
@@ -206,55 +209,73 @@ fn decode_flight_data(flight_data: &FlightData) -> Result<RecordBatch, anyhow::E
 
     // FlightData contains the Arrow IPC message
     let data = &flight_data.data_header;
-    
+
     // Create a cursor over the data
     let cursor = Cursor::new(data);
-    
+
     // Read the Arrow IPC stream
     let mut reader = StreamReader::try_new(cursor, None)
         .map_err(|e| anyhow::anyhow!("Failed to create StreamReader: {}", e))?;
-    
+
     // Read the first (and typically only) batch
     let batch = reader
         .next()
         .ok_or_else(|| anyhow::anyhow!("No batch in FlightData"))?
         .map_err(|e| anyhow::anyhow!("Failed to read batch: {}", e))?;
-    
+
     Ok(batch)
 }
 
 /// Convert Arrow RecordBatch to SpanData
 /// This converts Arrow columnar data to OTLP span format
 /// Uses the same schema structure as convert_spans_to_arrow_ipc
-pub(crate) fn convert_arrow_batch_to_spans(batch: &RecordBatch) -> Result<Vec<SpanData>, anyhow::Error> {
-    use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
+pub(crate) fn convert_arrow_batch_to_spans(
+    batch: &RecordBatch,
+) -> Result<Vec<SpanData>, anyhow::Error> {
+    use arrow::array::*;
+    use opentelemetry::trace::{
+        SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
+    };
     use opentelemetry::KeyValue;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
-    use arrow::array::*;
 
     let schema = batch.schema();
     let num_rows = batch.num_rows();
-    
+
     if num_rows == 0 {
         return Ok(Vec::new());
     }
 
     // Find column indices by name (matching the schema in convert_spans_to_arrow_ipc)
-    let trace_id_idx = schema.column_with_name("trace_id")
-        .ok_or_else(|| anyhow::anyhow!("Missing trace_id column"))?.0;
-    let span_id_idx = schema.column_with_name("span_id")
-        .ok_or_else(|| anyhow::anyhow!("Missing span_id column"))?.0;
+    let trace_id_idx = schema
+        .column_with_name("trace_id")
+        .ok_or_else(|| anyhow::anyhow!("Missing trace_id column"))?
+        .0;
+    let span_id_idx = schema
+        .column_with_name("span_id")
+        .ok_or_else(|| anyhow::anyhow!("Missing span_id column"))?
+        .0;
     let parent_span_id_idx = schema.column_with_name("parent_span_id");
-    let name_idx = schema.column_with_name("name")
-        .ok_or_else(|| anyhow::anyhow!("Missing name column"))?.0;
-    let kind_idx = schema.column_with_name("kind")
-        .ok_or_else(|| anyhow::anyhow!("Missing kind column"))?.0;
-    let start_time_idx = schema.column_with_name("start_time_unix_nano")
-        .ok_or_else(|| anyhow::anyhow!("Missing start_time_unix_nano column"))?.0;
-    let end_time_idx = schema.column_with_name("end_time_unix_nano")
-        .ok_or_else(|| anyhow::anyhow!("Missing end_time_unix_nano column"))?.0;
-    let status_code_idx = schema.column_with_name("status_code")
-        .ok_or_else(|| anyhow::anyhow!("Missing status_code column"))?.0;
+    let name_idx = schema
+        .column_with_name("name")
+        .ok_or_else(|| anyhow::anyhow!("Missing name column"))?
+        .0;
+    let kind_idx = schema
+        .column_with_name("kind")
+        .ok_or_else(|| anyhow::anyhow!("Missing kind column"))?
+        .0;
+    let start_time_idx = schema
+        .column_with_name("start_time_unix_nano")
+        .ok_or_else(|| anyhow::anyhow!("Missing start_time_unix_nano column"))?
+        .0;
+    let end_time_idx = schema
+        .column_with_name("end_time_unix_nano")
+        .ok_or_else(|| anyhow::anyhow!("Missing end_time_unix_nano column"))?
+        .0;
+    let status_code_idx = schema
+        .column_with_name("status_code")
+        .ok_or_else(|| anyhow::anyhow!("Missing status_code column"))?
+        .0;
     let status_message_idx = schema.column_with_name("status_message");
     let attributes_idx = schema.column_with_name("attributes");
 
@@ -271,29 +292,30 @@ pub(crate) fn convert_arrow_batch_to_spans(batch: &RecordBatch) -> Result<Vec<Sp
 
     for i in 0..num_rows {
         // Extract trace_id (16 bytes)
-        let trace_id_bytes = if let Some(binary_array) = trace_id_array.as_any().downcast_ref::<BinaryArray>() {
-            if binary_array.is_valid(i) && binary_array.value(i).len() == 16 {
-                let bytes = binary_array.value(i);
-                TraceId::from_bytes([
-                    bytes[0], bytes[1], bytes[2], bytes[3],
-                    bytes[4], bytes[5], bytes[6], bytes[7],
-                    bytes[8], bytes[9], bytes[10], bytes[11],
-                    bytes[12], bytes[13], bytes[14], bytes[15],
-                ])
+        let trace_id_bytes =
+            if let Some(binary_array) = trace_id_array.as_any().downcast_ref::<BinaryArray>() {
+                if binary_array.is_valid(i) && binary_array.value(i).len() == 16 {
+                    let bytes = binary_array.value(i);
+                    TraceId::from_bytes([
+                        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                        bytes[7], bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13],
+                        bytes[14], bytes[15],
+                    ])
+                } else {
+                    continue; // Skip invalid trace_id
+                }
             } else {
-                continue; // Skip invalid trace_id
-            }
-        } else {
-            continue; // Skip if not binary array
-        };
+                continue; // Skip if not binary array
+            };
 
         // Extract span_id (8 bytes)
-        let span_id = if let Some(binary_array) = span_id_array.as_any().downcast_ref::<BinaryArray>() {
+        let span_id = if let Some(binary_array) =
+            span_id_array.as_any().downcast_ref::<BinaryArray>()
+        {
             if binary_array.is_valid(i) && binary_array.value(i).len() == 8 {
                 let bytes = binary_array.value(i);
                 SpanId::from_bytes([
-                    bytes[0], bytes[1], bytes[2], bytes[3],
-                    bytes[4], bytes[5], bytes[6], bytes[7],
+                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
                 ])
             } else {
                 SpanId::INVALID
@@ -308,8 +330,8 @@ pub(crate) fn convert_arrow_batch_to_spans(batch: &RecordBatch) -> Result<Vec<Sp
                 if binary_array.is_valid(i) && binary_array.value(i).len() == 8 {
                     let bytes = binary_array.value(i);
                     SpanId::from_bytes([
-                        bytes[0], bytes[1], bytes[2], bytes[3],
-                        bytes[4], bytes[5], bytes[6], bytes[7],
+                        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                        bytes[7],
                     ])
                 } else {
                     SpanId::INVALID
@@ -351,69 +373,74 @@ pub(crate) fn convert_arrow_batch_to_spans(batch: &RecordBatch) -> Result<Vec<Sp
         };
 
         // Extract start_time
-        let start_time = if let Some(uint_array) = start_time_array.as_any().downcast_ref::<UInt64Array>() {
-            if uint_array.is_valid(i) {
-                let nanos = uint_array.value(i);
-                UNIX_EPOCH + Duration::from_nanos(nanos)
+        let start_time =
+            if let Some(uint_array) = start_time_array.as_any().downcast_ref::<UInt64Array>() {
+                if uint_array.is_valid(i) {
+                    let nanos = uint_array.value(i);
+                    UNIX_EPOCH + Duration::from_nanos(nanos)
+                } else {
+                    SystemTime::now()
+                }
             } else {
                 SystemTime::now()
-            }
-        } else {
-            SystemTime::now()
-        };
+            };
 
         // Extract end_time
-        let end_time = if let Some(uint_array) = end_time_array.as_any().downcast_ref::<UInt64Array>() {
-            if uint_array.is_valid(i) {
-                let nanos = uint_array.value(i);
-                UNIX_EPOCH + Duration::from_nanos(nanos)
+        let end_time =
+            if let Some(uint_array) = end_time_array.as_any().downcast_ref::<UInt64Array>() {
+                if uint_array.is_valid(i) {
+                    let nanos = uint_array.value(i);
+                    UNIX_EPOCH + Duration::from_nanos(nanos)
+                } else {
+                    SystemTime::now()
+                }
             } else {
                 SystemTime::now()
-            }
-        } else {
-            SystemTime::now()
-        };
+            };
 
         // Extract status_code and status_message
-        let status = if let Some(int_array) = status_code_array.as_any().downcast_ref::<Int32Array>() {
-            if int_array.is_valid(i) {
-                let code = int_array.value(i);
-                // Get status message if available
-                let message = if let Some((idx, _)) = status_message_idx {
-                    if let Some(string_array) = batch.column(idx).as_any().downcast_ref::<StringArray>() {
-                        if string_array.is_valid(i) {
-                            Some(string_array.value(i).to_string())
+        let status =
+            if let Some(int_array) = status_code_array.as_any().downcast_ref::<Int32Array>() {
+                if int_array.is_valid(i) {
+                    let code = int_array.value(i);
+                    // Get status message if available
+                    let message = if let Some((idx, _)) = status_message_idx {
+                        if let Some(string_array) =
+                            batch.column(idx).as_any().downcast_ref::<StringArray>()
+                        {
+                            if string_array.is_valid(i) {
+                                Some(string_array.value(i).to_string())
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
                     } else {
                         None
-                    }
-                } else {
-                    None
-                };
+                    };
 
-                match code {
-                    1 => Status::Ok,
-                    2 => {
-                        if let Some(msg) = message {
-                            Status::Error {
-                                description: msg.into(),
-                            }
-                        } else {
-                            Status::Error {
-                                description: "".into(),
+                    match code {
+                        1 => Status::Ok,
+                        2 => {
+                            if let Some(msg) = message {
+                                Status::Error {
+                                    description: msg.into(),
+                                }
+                            } else {
+                                Status::Error {
+                                    description: "".into(),
+                                }
                             }
                         }
+                        _ => Status::Unset,
                     }
-                    _ => Status::Unset,
+                } else {
+                    Status::Unset
                 }
             } else {
                 Status::Unset
-            }
-        } else {
-            Status::Unset
-        };
+            };
 
         // Extract attributes (JSON-encoded)
         let attributes = if let Some((idx, _)) = attributes_idx {
@@ -426,7 +453,9 @@ pub(crate) fn convert_arrow_batch_to_spans(batch: &RecordBatch) -> Result<Vec<Sp
                             obj.iter()
                                 .map(|(k, v)| {
                                     let value = match v {
-                                        serde_json::Value::String(s) => opentelemetry::Value::String(s.clone().into()),
+                                        serde_json::Value::String(s) => {
+                                            opentelemetry::Value::String(s.clone().into())
+                                        }
                                         serde_json::Value::Number(n) => {
                                             if let Some(i) = n.as_i64() {
                                                 opentelemetry::Value::I64(i)
@@ -436,7 +465,9 @@ pub(crate) fn convert_arrow_batch_to_spans(batch: &RecordBatch) -> Result<Vec<Sp
                                                 opentelemetry::Value::String(n.to_string().into())
                                             }
                                         }
-                                        serde_json::Value::Bool(b) => opentelemetry::Value::Bool(*b),
+                                        serde_json::Value::Bool(b) => {
+                                            opentelemetry::Value::Bool(*b)
+                                        }
                                         _ => opentelemetry::Value::String(v.to_string().into()),
                                     };
                                     KeyValue::new(k.clone(), value)
@@ -458,11 +489,17 @@ pub(crate) fn convert_arrow_batch_to_spans(batch: &RecordBatch) -> Result<Vec<Sp
             vec![]
         };
 
-        let span_context = SpanContext::new(trace_id_bytes, span_id, TraceFlags::default(), false, TraceState::default());
+        let span_context = SpanContext::new(
+            trace_id_bytes,
+            span_id,
+            TraceFlags::default(),
+            false,
+            TraceState::default(),
+        );
 
         // Create default instrumentation scope
-        let instrumentation_scope = opentelemetry::InstrumentationScope::builder("arrow-flight")
-            .build();
+        let instrumentation_scope =
+            opentelemetry::InstrumentationScope::builder("arrow-flight").build();
 
         let span_data = SpanData {
             span_context,
@@ -492,12 +529,12 @@ pub(crate) fn convert_arrow_batch_to_spans(batch: &RecordBatch) -> Result<Vec<Sp
 pub(crate) fn convert_arrow_batch_to_resource_metrics(
     batch: &RecordBatch,
 ) -> Result<Option<ResourceMetrics>, anyhow::Error> {
-    use opentelemetry::KeyValue;
     use arrow::array::*;
+    use opentelemetry::KeyValue;
 
     let schema = batch.schema();
     let num_rows = batch.num_rows();
-    
+
     if num_rows == 0 {
         return Ok(None);
     }
@@ -508,14 +545,22 @@ pub(crate) fn convert_arrow_batch_to_resource_metrics(
     }
 
     // Find column indices by name (matching the schema in convert_metrics_to_arrow_ipc)
-    let metric_name_idx = schema.column_with_name("metric_name")
-        .ok_or_else(|| anyhow::anyhow!("Missing metric_name column"))?.0;
-    let value_idx = schema.column_with_name("value")
-        .ok_or_else(|| anyhow::anyhow!("Missing value column"))?.0;
-    let timestamp_idx = schema.column_with_name("timestamp_unix_nano")
-        .ok_or_else(|| anyhow::anyhow!("Missing timestamp_unix_nano column"))?.0;
-    let metric_type_idx = schema.column_with_name("metric_type")
-        .ok_or_else(|| anyhow::anyhow!("Missing metric_type column"))?.0;
+    let metric_name_idx = schema
+        .column_with_name("metric_name")
+        .ok_or_else(|| anyhow::anyhow!("Missing metric_name column"))?
+        .0;
+    let value_idx = schema
+        .column_with_name("value")
+        .ok_or_else(|| anyhow::anyhow!("Missing value column"))?
+        .0;
+    let timestamp_idx = schema
+        .column_with_name("timestamp_unix_nano")
+        .ok_or_else(|| anyhow::anyhow!("Missing timestamp_unix_nano column"))?
+        .0;
+    let metric_type_idx = schema
+        .column_with_name("metric_type")
+        .ok_or_else(|| anyhow::anyhow!("Missing metric_type column"))?
+        .0;
     let attributes_idx = schema.column_with_name("attributes");
 
     // Extract arrays (preserved for future use when full metric conversion is implemented)
@@ -536,7 +581,9 @@ pub(crate) fn convert_arrow_batch_to_resource_metrics(
                         if let Some(obj) = json_value.as_object() {
                             for (k, v) in obj.iter() {
                                 let value = match v {
-                                    serde_json::Value::String(s) => opentelemetry::Value::String(s.clone().into()),
+                                    serde_json::Value::String(s) => {
+                                        opentelemetry::Value::String(s.clone().into())
+                                    }
                                     serde_json::Value::Number(n) => {
                                         if let Some(i) = n.as_i64() {
                                             opentelemetry::Value::I64(i)

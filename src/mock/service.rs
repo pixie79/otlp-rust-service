@@ -21,6 +21,7 @@ use tonic::{Request, Response, Status};
 use tracing::info;
 
 // Re-export Arrow Flight types for mock service
+use arrow::record_batch::RecordBatch;
 use arrow_flight::{
     flight_service_server::{FlightService, FlightServiceServer},
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
@@ -29,7 +30,6 @@ use arrow_flight::{
 use std::pin::Pin;
 use tokio_stream::{Stream, StreamExt};
 use tonic::Streaming;
-use arrow::record_batch::RecordBatch;
 
 /// Mock OTLP service state
 #[derive(Debug, Default)]
@@ -70,22 +70,26 @@ impl MockOtlpService {
     /// Returns the addresses where the servers are listening
     pub async fn start(&self) -> Result<MockServiceAddresses, String> {
         // Start Protobuf server
-        let protobuf_addr = "127.0.0.1:0".parse::<SocketAddr>()
+        let protobuf_addr = "127.0.0.1:0"
+            .parse::<SocketAddr>()
             .map_err(|e| format!("Failed to parse protobuf address: {}", e))?;
         let protobuf_listener = tokio::net::TcpListener::bind(&protobuf_addr)
             .await
             .map_err(|e| format!("Failed to bind protobuf listener: {}", e))?;
-        let protobuf_addr = protobuf_listener.local_addr()
+        let protobuf_addr = protobuf_listener
+            .local_addr()
             .map_err(|e| format!("Failed to get protobuf local address: {}", e))?;
         let protobuf_addr_str = format!("http://{}", protobuf_addr);
 
         // Start Arrow Flight server
-        let arrow_flight_addr = "127.0.0.1:0".parse::<SocketAddr>()
+        let arrow_flight_addr = "127.0.0.1:0"
+            .parse::<SocketAddr>()
             .map_err(|e| format!("Failed to parse arrow flight address: {}", e))?;
         let arrow_flight_listener = tokio::net::TcpListener::bind(&arrow_flight_addr)
             .await
             .map_err(|e| format!("Failed to bind arrow flight listener: {}", e))?;
-        let arrow_flight_addr = arrow_flight_listener.local_addr()
+        let arrow_flight_addr = arrow_flight_listener
+            .local_addr()
             .map_err(|e| format!("Failed to get arrow flight local address: {}", e))?;
         let arrow_flight_addr_str = format!("http://{}", arrow_flight_addr);
 
@@ -255,8 +259,9 @@ impl MetricsService for MockMetricsServiceImpl {
         let req = request.into_inner();
 
         // Convert protobuf to ResourceMetrics using the same conversion as the real server
-        let resource_metrics = crate::otlp::server::convert_metrics_request_to_resource_metrics(&req)
-            .map_err(|e| Status::internal(format!("Failed to convert metrics: {}", e)))?;
+        let resource_metrics =
+            crate::otlp::server::convert_metrics_request_to_resource_metrics(&req)
+                .map_err(|e| Status::internal(format!("Failed to convert metrics: {}", e)))?;
 
         // Store in mock state
         if let Some(metrics) = resource_metrics {
@@ -360,7 +365,9 @@ impl FlightService for MockFlightServiceImpl {
                 }
 
                 // Try to convert to metrics
-                if let Ok(Some(metrics)) = crate::otlp::server_arrow::convert_arrow_batch_to_resource_metrics(&batch) {
+                if let Ok(Some(metrics)) =
+                    crate::otlp::server_arrow::convert_arrow_batch_to_resource_metrics(&batch)
+                {
                     let mut state = state.write().await;
                     state.received_metrics.push(metrics);
                     state.grpc_calls += 1;
@@ -404,11 +411,11 @@ fn decode_flight_data(flight_data: &FlightData) -> Result<RecordBatch, anyhow::E
     let cursor = Cursor::new(data);
     let mut reader = StreamReader::try_new(cursor, None)
         .map_err(|e| anyhow::anyhow!("Failed to create StreamReader: {}", e))?;
-    
+
     let batch = reader
         .next()
         .ok_or_else(|| anyhow::anyhow!("No batch in FlightData"))?
         .map_err(|e| anyhow::anyhow!("Failed to read batch: {}", e))?;
-    
+
     Ok(batch)
 }

@@ -22,15 +22,14 @@ impl ConfigLoader {
             "Loading configuration from YAML file"
         );
 
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| {
-                warn!(
-                    config_path = %path.display(),
-                    error = %e,
-                    "Failed to read configuration file"
-                );
-                OtlpConfigError::InvalidOutputDir(format!("Failed to read config file: {}", e))
-            })?;
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            warn!(
+                config_path = %path.display(),
+                error = %e,
+                "Failed to read configuration file"
+            );
+            OtlpConfigError::InvalidOutputDir(format!("Failed to read config file: {}", e))
+        })?;
 
         debug!(
             config_path = %path.display(),
@@ -38,15 +37,14 @@ impl ConfigLoader {
             "Read configuration file"
         );
 
-        let mut config: Config = serde_yaml::from_str(&content)
-            .map_err(|e| {
-                warn!(
-                    config_path = %path.display(),
-                    error = %e,
-                    "Failed to parse YAML configuration"
-                );
-                OtlpConfigError::ValidationFailed(format!("Failed to parse YAML: {}", e))
-            })?;
+        let mut config: Config = serde_yaml::from_str(&content).map_err(|e| {
+            warn!(
+                config_path = %path.display(),
+                error = %e,
+                "Failed to parse YAML configuration"
+            );
+            OtlpConfigError::ValidationFailed(format!("Failed to parse YAML: {}", e))
+        })?;
 
         debug!(
             config_path = %path.display(),
@@ -301,7 +299,10 @@ impl ConfigLoader {
         if let Ok(enabled) = env::var("OTLP_FORWARDING_ENABLED") {
             if enabled.parse::<bool>().unwrap_or(false) {
                 use crate::config::types::ForwardingConfig;
-                let mut forwarding = config.forwarding.take().unwrap_or_else(ForwardingConfig::default);
+                let mut forwarding = config
+                    .forwarding
+                    .take()
+                    .unwrap_or_else(ForwardingConfig::default);
                 forwarding.enabled = true;
 
                 // OTLP_FORWARDING_ENDPOINT_URL
@@ -324,4 +325,3 @@ impl ConfigLoader {
         }
     }
 }
-

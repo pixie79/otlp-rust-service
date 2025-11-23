@@ -76,7 +76,7 @@ impl FormatConverter {
     }
 
     /// Convert Protobuf trace request to Arrow Flight RecordBatch
-    /// 
+    ///
     /// This converts an OTLP Protobuf trace export request into Arrow format
     /// that can be sent via Arrow Flight.
     pub fn protobuf_to_arrow_flight_traces(
@@ -84,32 +84,32 @@ impl FormatConverter {
         request: &ExportTraceServiceRequest,
     ) -> Result<Option<RecordBatch>, OtlpError> {
         // First convert Protobuf to SDK types
-        let spans = server::convert_trace_request_to_spans(request)
-            .map_err(|e| {
-                error!(error = %e, "Failed to convert Protobuf trace request to spans");
-                OtlpError::Export(OtlpExportError::FormatConversionError(
-                    format!("Protobuf to Arrow Flight trace conversion failed: {}", e),
-                ))
-            })?;
+        let spans = server::convert_trace_request_to_spans(request).map_err(|e| {
+            error!(error = %e, "Failed to convert Protobuf trace request to spans");
+            OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                "Protobuf to Arrow Flight trace conversion failed: {}",
+                e
+            )))
+        })?;
 
         if spans.is_empty() {
             return Ok(None);
         }
 
         // Convert spans to Arrow RecordBatch using the same logic as exporter
-        let batch = Self::spans_to_arrow_batch(&spans)
-            .map_err(|e| {
-                error!(error = %e, "Failed to convert spans to Arrow batch");
-                OtlpError::Export(OtlpExportError::FormatConversionError(
-                    format!("Span to Arrow batch conversion failed: {}", e),
-                ))
-            })?;
+        let batch = Self::spans_to_arrow_batch(&spans).map_err(|e| {
+            error!(error = %e, "Failed to convert spans to Arrow batch");
+            OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                "Span to Arrow batch conversion failed: {}",
+                e
+            )))
+        })?;
 
         Ok(Some(batch))
     }
 
     /// Convert Protobuf metrics request to Arrow Flight RecordBatch
-    /// 
+    ///
     /// This converts an OTLP Protobuf metrics export request into Arrow format
     /// that can be sent via Arrow Flight.
     pub fn protobuf_to_arrow_flight_metrics(
@@ -120,9 +120,10 @@ impl FormatConverter {
         let resource_metrics = server::convert_metrics_request_to_resource_metrics(request)
             .map_err(|e| {
                 error!(error = %e, "Failed to convert Protobuf metrics request to ResourceMetrics");
-                OtlpError::Export(OtlpExportError::FormatConversionError(
-                    format!("Protobuf to Arrow Flight metrics conversion failed: {}", e),
-                ))
+                OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                    "Protobuf to Arrow Flight metrics conversion failed: {}",
+                    e
+                )))
             })?;
 
         let resource_metrics = match resource_metrics {
@@ -131,19 +132,19 @@ impl FormatConverter {
         };
 
         // Convert ResourceMetrics to Arrow RecordBatch using the same logic as exporter
-        let batch = Self::resource_metrics_to_arrow_batch(&resource_metrics)
-            .map_err(|e| {
-                error!(error = %e, "Failed to convert ResourceMetrics to Arrow batch");
-                OtlpError::Export(OtlpExportError::FormatConversionError(
-                    format!("ResourceMetrics to Arrow batch conversion failed: {}", e),
-                ))
-            })?;
+        let batch = Self::resource_metrics_to_arrow_batch(&resource_metrics).map_err(|e| {
+            error!(error = %e, "Failed to convert ResourceMetrics to Arrow batch");
+            OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                "ResourceMetrics to Arrow batch conversion failed: {}",
+                e
+            )))
+        })?;
 
         Ok(Some(batch))
     }
 
     /// Convert Arrow Flight RecordBatch to Protobuf trace request
-    /// 
+    ///
     /// This converts an Arrow Flight trace batch into OTLP Protobuf format
     /// that can be sent via standard gRPC Protobuf.
     pub fn arrow_flight_to_protobuf_traces(
@@ -151,13 +152,13 @@ impl FormatConverter {
         batch: &RecordBatch,
     ) -> Result<Option<ExportTraceServiceRequest>, OtlpError> {
         // Convert Arrow batch to SDK spans
-        let spans = server_arrow::convert_arrow_batch_to_spans(batch)
-            .map_err(|e| {
-                error!(error = %e, "Failed to convert Arrow batch to spans");
-                OtlpError::Export(OtlpExportError::FormatConversionError(
-                    format!("Arrow batch to spans conversion failed: {}", e),
-                ))
-            })?;
+        let spans = server_arrow::convert_arrow_batch_to_spans(batch).map_err(|e| {
+            error!(error = %e, "Failed to convert Arrow batch to spans");
+            OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                "Arrow batch to spans conversion failed: {}",
+                e
+            )))
+        })?;
 
         if spans.is_empty() {
             return Ok(None);
@@ -168,19 +169,19 @@ impl FormatConverter {
         // This is a simplified conversion - in a full implementation, we'd need
         // to properly reconstruct ResourceSpans with all metadata
         let request = ExportTraceServiceRequest::default();
-        
+
         // For now, we create a minimal request
         // A full implementation would need to properly group spans by resource and scope
         warn!("Arrow Flight to Protobuf trace conversion: Simplified implementation - full metadata reconstruction not yet implemented");
-        
+
         // TODO: Properly reconstruct ResourceSpans from spans with resource and scope information
         // This requires tracking resource and scope metadata during conversion
-        
+
         Ok(Some(request))
     }
 
     /// Convert Arrow Flight RecordBatch to Protobuf metrics request
-    /// 
+    ///
     /// This converts an Arrow Flight metrics batch into OTLP Protobuf format
     /// that can be sent via standard gRPC Protobuf.
     pub fn arrow_flight_to_protobuf_metrics(
@@ -191,9 +192,10 @@ impl FormatConverter {
         let resource_metrics = server_arrow::convert_arrow_batch_to_resource_metrics(batch)
             .map_err(|e| {
                 error!(error = %e, "Failed to convert Arrow batch to ResourceMetrics");
-                OtlpError::Export(OtlpExportError::FormatConversionError(
-                    format!("Arrow batch to ResourceMetrics conversion failed: {}", e),
-                ))
+                OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                    "Arrow batch to ResourceMetrics conversion failed: {}",
+                    e
+                )))
             })?;
 
         let resource_metrics = match resource_metrics {
@@ -205,17 +207,17 @@ impl FormatConverter {
         // Note: We need to reconstruct the Protobuf request from ResourceMetrics
         // This is a simplified conversion
         let request = ExportMetricsServiceRequest::default();
-        
+
         warn!("Arrow Flight to Protobuf metrics conversion: Simplified implementation - full metadata reconstruction not yet implemented");
-        
+
         // TODO: Properly reconstruct ResourceMetrics in Protobuf format
         // This requires converting SDK ResourceMetrics back to Protobuf ResourceMetrics
-        
+
         Ok(Some(request))
     }
 
     /// Convert SDK spans to Protobuf trace request
-    /// 
+    ///
     /// Helper method to convert spans (from any source) to Protobuf format.
     pub fn spans_to_protobuf(
         &self,
@@ -228,14 +230,14 @@ impl FormatConverter {
         // Create a minimal Protobuf request
         // Full implementation would properly group spans by resource and scope
         let request = ExportTraceServiceRequest::default();
-        
+
         warn!("Spans to Protobuf conversion: Simplified implementation - full metadata reconstruction not yet implemented");
-        
+
         Ok(Some(request))
     }
 
     /// Convert SDK ResourceMetrics to Protobuf metrics request
-    /// 
+    ///
     /// Helper method to convert ResourceMetrics (from any source) to Protobuf format.
     pub fn resource_metrics_to_protobuf(
         &self,
@@ -243,9 +245,9 @@ impl FormatConverter {
     ) -> Result<Option<ExportMetricsServiceRequest>, OtlpError> {
         // Create a minimal Protobuf request
         let request = ExportMetricsServiceRequest::default();
-        
+
         warn!("ResourceMetrics to Protobuf conversion: Simplified implementation - full metadata reconstruction not yet implemented");
-        
+
         Ok(Some(request))
     }
 }
@@ -303,10 +305,20 @@ impl FormatConverter {
             });
             names.push(Some(span_data.name.to_string()));
             kinds.push(span_data.span_kind.clone() as i32);
-            start_times.push(span_data.start_time.duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default().as_nanos() as u64);
-            end_times.push(span_data.end_time.duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default().as_nanos() as u64);
+            start_times.push(
+                span_data
+                    .start_time
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos() as u64,
+            );
+            end_times.push(
+                span_data
+                    .end_time
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos() as u64,
+            );
             use opentelemetry::trace::Status as OtelStatus;
             status_codes.push(match span_data.status {
                 OtelStatus::Unset => 0,
@@ -321,7 +333,9 @@ impl FormatConverter {
                 let key = kv.key.as_str();
                 let json_value = match &kv.value {
                     opentelemetry::Value::I64(i) => serde_json::Value::Number((*i).into()),
-                    opentelemetry::Value::F64(f) => serde_json::Value::Number(serde_json::Number::from_f64(*f).unwrap_or(serde_json::Number::from(0))),
+                    opentelemetry::Value::F64(f) => serde_json::Value::Number(
+                        serde_json::Number::from_f64(*f).unwrap_or(serde_json::Number::from(0)),
+                    ),
                     opentelemetry::Value::Bool(b) => serde_json::Value::Bool(*b),
                     opentelemetry::Value::String(s) => serde_json::Value::String(s.to_string()),
                     _ => serde_json::Value::String(format!("{:?}", kv.value)),
@@ -333,10 +347,15 @@ impl FormatConverter {
         }
 
         // Build Arrow arrays
-        let trace_id_refs: Vec<Option<&[u8]>> = trace_ids.iter().map(|opt| opt.as_deref()).collect();
+        let trace_id_refs: Vec<Option<&[u8]>> =
+            trace_ids.iter().map(|opt| opt.as_deref()).collect();
         let span_id_refs: Vec<Option<&[u8]>> = span_ids.iter().map(|opt| opt.as_deref()).collect();
-        let parent_span_id_refs: Vec<Option<&[u8]>> = parent_span_ids.iter().map(|opt| opt.as_deref()).collect();
-        let name_refs: Vec<Option<&str>> = names.iter().map(|opt| opt.as_ref().map(|s| s.as_ref())).collect();
+        let parent_span_id_refs: Vec<Option<&[u8]>> =
+            parent_span_ids.iter().map(|opt| opt.as_deref()).collect();
+        let name_refs: Vec<Option<&str>> = names
+            .iter()
+            .map(|opt| opt.as_ref().map(|s| s.as_ref()))
+            .collect();
 
         let trace_id_array = Arc::new(BinaryArray::from(trace_id_refs));
         let span_id_array = Arc::new(BinaryArray::from(span_id_refs));
@@ -370,19 +389,21 @@ impl FormatConverter {
     }
 
     /// Convert ResourceMetrics to Arrow RecordBatch (helper function)
-    /// 
+    ///
     /// Note: ResourceMetrics fields are private in opentelemetry-sdk 0.31, so we use
     /// a simplified approach. For full implementation, we'd need to use opentelemetry-proto
     /// conversion utilities or access metrics through public APIs.
-    pub(crate) fn resource_metrics_to_arrow_batch(_metrics: &ResourceMetrics) -> Result<RecordBatch, anyhow::Error> {
+    pub(crate) fn resource_metrics_to_arrow_batch(
+        _metrics: &ResourceMetrics,
+    ) -> Result<RecordBatch, anyhow::Error> {
         use arrow::array::*;
         use arrow::datatypes::*;
         use std::sync::Arc;
 
         // Since ResourceMetrics fields are private, we create a minimal empty batch
         let _ = _metrics; // Acknowledge parameter for future use
-        // Full implementation would require proper access to metrics data
-        // This is a placeholder that creates the correct schema structure
+                          // Full implementation would require proper access to metrics data
+                          // This is a placeholder that creates the correct schema structure
         let schema = Schema::new(vec![
             Field::new("metric_name", DataType::Utf8, false),
             Field::new("value", DataType::Float64, false),
@@ -406,4 +427,3 @@ impl FormatConverter {
         Ok(batch)
     }
 }
-

@@ -50,7 +50,7 @@ impl CircuitBreaker {
         F: std::future::Future<Output = Result<R, OtlpError>>,
     {
         let state = *self.state.lock().await;
-        
+
         match state {
             CircuitState::Open => {
                 // Check if we should transition to half-open
@@ -131,19 +131,20 @@ impl OtlpForwarder {
 
         // Create HTTP client with authentication headers if needed
         let client_builder = reqwest::Client::builder();
-        
+
         if config.authentication.is_some() {
             // Authentication headers will be added per-request
         }
 
-        let client = client_builder
-            .build()
-            .map_err(|e| OtlpError::Export(OtlpExportError::ForwardingError(
-                format!("Failed to create HTTP client: {}", e),
-            )))?;
+        let client = client_builder.build().map_err(|e| {
+            OtlpError::Export(OtlpExportError::ForwardingError(format!(
+                "Failed to create HTTP client: {}",
+                e
+            )))
+        })?;
 
         let circuit_breaker = Arc::new(CircuitBreaker::new(
-            5, // 5 failures before opening
+            5,                       // 5 failures before opening
             Duration::from_secs(60), // 60 second timeout
         ));
 
@@ -162,7 +163,7 @@ impl OtlpForwarder {
     }
 
     /// Forward traces asynchronously
-    /// 
+    ///
     /// This method detects the input format and converts if needed based on
     /// the configured forwarding protocol.
     pub async fn forward_traces(&self, spans: Vec<SpanData>) -> Result<(), OtlpError> {
@@ -188,31 +189,37 @@ impl OtlpForwarder {
 
     /// Internal method to forward traces (called asynchronously)
     async fn forward_traces_internal(&self, spans: Vec<SpanData>) -> Result<(), OtlpError> {
-        self.circuit_breaker.call(async {
-            match self.config.protocol {
-                ForwardingProtocol::Protobuf => {
-                    // Convert spans to Protobuf request
-                    let request = self.converter.spans_to_protobuf(spans)
-                        .map_err(|e| OtlpError::Export(OtlpExportError::FormatConversionError(
-                            format!("Failed to convert spans to Protobuf: {}", e),
-                        )))?;
+        self.circuit_breaker
+            .call(async {
+                match self.config.protocol {
+                    ForwardingProtocol::Protobuf => {
+                        // Convert spans to Protobuf request
+                        let request = self.converter.spans_to_protobuf(spans).map_err(|e| {
+                            OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                                "Failed to convert spans to Protobuf: {}",
+                                e
+                            )))
+                        })?;
 
-                    if let Some(req) = request {
-                        self.send_protobuf_traces(req).await?;
+                        if let Some(req) = request {
+                            self.send_protobuf_traces(req).await?;
+                        }
+                    }
+                    ForwardingProtocol::ArrowFlight => {
+                        // Convert spans to Arrow Flight batch
+                        let batch = FormatConverter::spans_to_arrow_batch(&spans).map_err(|e| {
+                            OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                                "Failed to convert spans to Arrow batch: {}",
+                                e
+                            )))
+                        })?;
+
+                        self.send_arrow_flight_traces(batch).await?;
                     }
                 }
-                ForwardingProtocol::ArrowFlight => {
-                    // Convert spans to Arrow Flight batch
-                    let batch = FormatConverter::spans_to_arrow_batch(&spans)
-                        .map_err(|e| OtlpError::Export(OtlpExportError::FormatConversionError(
-                            format!("Failed to convert spans to Arrow batch: {}", e),
-                        )))?;
-
-                    self.send_arrow_flight_traces(batch).await?;
-                }
-            }
-            Ok(())
-        }).await
+                Ok(())
+            })
+            .await
     }
 
     /// Forward metrics asynchronously
@@ -241,39 +248,53 @@ impl OtlpForwarder {
 
     /// Internal method to forward metrics (called asynchronously)
     async fn forward_metrics_internal(&self, _metrics: &ResourceMetrics) -> Result<(), OtlpError> {
-        self.circuit_breaker.call(async {
-            match self.config.protocol {
-                ForwardingProtocol::Protobuf => {
-                    // Convert ResourceMetrics to Protobuf request
-                    let request = self.converter.resource_metrics_to_protobuf(_metrics)
-                        .map_err(|e| OtlpError::Export(OtlpExportError::FormatConversionError(
-                            format!("Failed to convert ResourceMetrics to Protobuf: {}", e),
-                        )))?;
+        self.circuit_breaker
+            .call(async {
+                match self.config.protocol {
+                    ForwardingProtocol::Protobuf => {
+                        // Convert ResourceMetrics to Protobuf request
+                        let request = self
+                            .converter
+                            .resource_metrics_to_protobuf(_metrics)
+                            .map_err(|e| {
+                                OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                                    "Failed to convert ResourceMetrics to Protobuf: {}",
+                                    e
+                                )))
+                            })?;
 
-                    if let Some(req) = request {
-                        self.send_protobuf_metrics(req).await?;
+                        if let Some(req) = request {
+                            self.send_protobuf_metrics(req).await?;
+                        }
+                    }
+                    ForwardingProtocol::ArrowFlight => {
+                        // Convert ResourceMetrics to Arrow Flight batch
+                        let batch = FormatConverter::resource_metrics_to_arrow_batch(_metrics)
+                            .map_err(|e| {
+                                OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                                    "Failed to convert ResourceMetrics to Arrow batch: {}",
+                                    e
+                                )))
+                            })?;
+
+                        self.send_arrow_flight_metrics(batch).await?;
                     }
                 }
-                ForwardingProtocol::ArrowFlight => {
-                    // Convert ResourceMetrics to Arrow Flight batch
-                    let batch = FormatConverter::resource_metrics_to_arrow_batch(_metrics)
-                        .map_err(|e| OtlpError::Export(OtlpExportError::FormatConversionError(
-                            format!("Failed to convert ResourceMetrics to Arrow batch: {}", e),
-                        )))?;
-
-                    self.send_arrow_flight_metrics(batch).await?;
-                }
-            }
-            Ok(())
-        }).await
+                Ok(())
+            })
+            .await
     }
 
     /// Send Protobuf traces to remote endpoint
-    async fn send_protobuf_traces(&self, _request: ExportTraceServiceRequest) -> Result<(), OtlpError> {
-        let url = self.config.endpoint_url.as_ref()
-            .ok_or_else(|| OtlpError::Export(OtlpExportError::ForwardingError(
+    async fn send_protobuf_traces(
+        &self,
+        _request: ExportTraceServiceRequest,
+    ) -> Result<(), OtlpError> {
+        let url = self.config.endpoint_url.as_ref().ok_or_else(|| {
+            OtlpError::Export(OtlpExportError::ForwardingError(
                 "Endpoint URL is required".to_string(),
-            )))?;
+            ))
+        })?;
 
         // Serialize request to protobuf bytes using tonic's encoding
         // Note: For HTTP forwarding, we'd typically use opentelemetry-otlp's HTTP exporter
@@ -281,20 +302,20 @@ impl OtlpForwarder {
         let buf = Vec::new(); // TODO: Implement proper Protobuf encoding for HTTP
 
         // Build request with authentication
-        let mut http_request = self.client
+        let mut http_request = self
+            .client
             .post(format!("{}/v1/traces", url))
             .header("Content-Type", "application/x-protobuf");
 
         http_request = self.add_auth_headers(http_request)?;
 
         // Send request
-        let response = http_request
-            .body(buf)
-            .send()
-            .await
-            .map_err(|e| OtlpError::Export(OtlpExportError::ForwardingError(
-                format!("Failed to send Protobuf traces: {}", e),
-            )))?;
+        let response = http_request.body(buf).send().await.map_err(|e| {
+            OtlpError::Export(OtlpExportError::ForwardingError(format!(
+                "Failed to send Protobuf traces: {}",
+                e
+            )))
+        })?;
 
         if !response.status().is_success() {
             return Err(OtlpError::Export(OtlpExportError::ForwardingError(
@@ -307,11 +328,15 @@ impl OtlpForwarder {
     }
 
     /// Send Protobuf metrics to remote endpoint
-    async fn send_protobuf_metrics(&self, _request: ExportMetricsServiceRequest) -> Result<(), OtlpError> {
-        let url = self.config.endpoint_url.as_ref()
-            .ok_or_else(|| OtlpError::Export(OtlpExportError::ForwardingError(
+    async fn send_protobuf_metrics(
+        &self,
+        _request: ExportMetricsServiceRequest,
+    ) -> Result<(), OtlpError> {
+        let url = self.config.endpoint_url.as_ref().ok_or_else(|| {
+            OtlpError::Export(OtlpExportError::ForwardingError(
                 "Endpoint URL is required".to_string(),
-            )))?;
+            ))
+        })?;
 
         // Serialize request to protobuf bytes using tonic's encoding
         // Note: For HTTP forwarding, we'd typically use opentelemetry-otlp's HTTP exporter
@@ -319,20 +344,20 @@ impl OtlpForwarder {
         let buf = Vec::new(); // TODO: Implement proper Protobuf encoding for HTTP
 
         // Build request with authentication
-        let mut http_request = self.client
+        let mut http_request = self
+            .client
             .post(format!("{}/v1/metrics", url))
             .header("Content-Type", "application/x-protobuf");
 
         http_request = self.add_auth_headers(http_request)?;
 
         // Send request
-        let response = http_request
-            .body(buf)
-            .send()
-            .await
-            .map_err(|e| OtlpError::Export(OtlpExportError::ForwardingError(
-                format!("Failed to send Protobuf metrics: {}", e),
-            )))?;
+        let response = http_request.body(buf).send().await.map_err(|e| {
+            OtlpError::Export(OtlpExportError::ForwardingError(format!(
+                "Failed to send Protobuf metrics: {}",
+                e
+            )))
+        })?;
 
         if !response.status().is_success() {
             return Err(OtlpError::Export(OtlpExportError::ForwardingError(
@@ -345,7 +370,10 @@ impl OtlpForwarder {
     }
 
     /// Send Arrow Flight traces to remote endpoint
-    async fn send_arrow_flight_traces(&self, _batch: arrow::record_batch::RecordBatch) -> Result<(), OtlpError> {
+    async fn send_arrow_flight_traces(
+        &self,
+        _batch: arrow::record_batch::RecordBatch,
+    ) -> Result<(), OtlpError> {
         // TODO: Implement Arrow Flight client
         // This requires a gRPC client with Arrow Flight support
         warn!("Arrow Flight forwarding not yet fully implemented - using placeholder");
@@ -353,7 +381,10 @@ impl OtlpForwarder {
     }
 
     /// Send Arrow Flight metrics to remote endpoint
-    async fn send_arrow_flight_metrics(&self, _batch: arrow::record_batch::RecordBatch) -> Result<(), OtlpError> {
+    async fn send_arrow_flight_metrics(
+        &self,
+        _batch: arrow::record_batch::RecordBatch,
+    ) -> Result<(), OtlpError> {
         // TODO: Implement Arrow Flight client
         // This requires a gRPC client with Arrow Flight support
         warn!("Arrow Flight forwarding not yet fully implemented - using placeholder");
@@ -368,31 +399,38 @@ impl OtlpForwarder {
         if let Some(ref auth) = self.config.authentication {
             match auth.auth_type.as_str() {
                 "api_key" => {
-                    let key = auth.credentials.get("key")
-                        .ok_or_else(|| OtlpError::Export(OtlpExportError::ForwardingError(
+                    let key = auth.credentials.get("key").ok_or_else(|| {
+                        OtlpError::Export(OtlpExportError::ForwardingError(
                             "API key authentication requires 'key' in credentials".to_string(),
-                        )))?;
+                        ))
+                    })?;
                     let default_header = "X-API-Key".to_string();
-                    let header_name = auth.credentials.get("header_name")
+                    let header_name = auth
+                        .credentials
+                        .get("header_name")
                         .unwrap_or(&default_header);
                     request = request.header(header_name, key);
                 }
                 "bearer_token" => {
-                    let token = auth.credentials.get("token")
-                        .ok_or_else(|| OtlpError::Export(OtlpExportError::ForwardingError(
-                            "Bearer token authentication requires 'token' in credentials".to_string(),
-                        )))?;
+                    let token = auth.credentials.get("token").ok_or_else(|| {
+                        OtlpError::Export(OtlpExportError::ForwardingError(
+                            "Bearer token authentication requires 'token' in credentials"
+                                .to_string(),
+                        ))
+                    })?;
                     request = request.bearer_auth(token);
                 }
                 "basic" => {
-                    let username = auth.credentials.get("username")
-                        .ok_or_else(|| OtlpError::Export(OtlpExportError::ForwardingError(
+                    let username = auth.credentials.get("username").ok_or_else(|| {
+                        OtlpError::Export(OtlpExportError::ForwardingError(
                             "Basic authentication requires 'username' in credentials".to_string(),
-                        )))?;
-                    let password = auth.credentials.get("password")
-                        .ok_or_else(|| OtlpError::Export(OtlpExportError::ForwardingError(
+                        ))
+                    })?;
+                    let password = auth.credentials.get("password").ok_or_else(|| {
+                        OtlpError::Export(OtlpExportError::ForwardingError(
                             "Basic authentication requires 'password' in credentials".to_string(),
-                        )))?;
+                        ))
+                    })?;
                     request = request.basic_auth(username, Some(password));
                 }
                 _ => {

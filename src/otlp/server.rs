@@ -30,9 +30,7 @@ pub struct OtlpGrpcServer {
 impl OtlpGrpcServer {
     /// Create a new gRPC server
     pub fn new(file_exporter: Arc<OtlpFileExporter>) -> Self {
-        Self {
-            file_exporter,
-        }
+        Self { file_exporter }
     }
 
     /// Start the gRPC server on the specified address
@@ -52,7 +50,9 @@ impl OtlpGrpcServer {
             .add_service(MetricsServiceServer::new(metrics_service))
             .serve(addr)
             .await
-            .map_err(|e| OtlpError::Server(crate::error::OtlpServerError::StartupError(e.to_string())))?;
+            .map_err(|e| {
+                OtlpError::Server(crate::error::OtlpServerError::StartupError(e.to_string()))
+            })?;
 
         Ok(())
     }
@@ -131,7 +131,9 @@ impl MetricsService for MetricsServiceImpl {
 pub(crate) fn convert_trace_request_to_spans(
     req: &ExportTraceServiceRequest,
 ) -> Result<Vec<SpanData>, anyhow::Error> {
-    use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
+    use opentelemetry::trace::{
+        SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
+    };
     use opentelemetry::KeyValue;
     use std::time::{Duration, UNIX_EPOCH};
 
@@ -145,21 +147,28 @@ pub(crate) fn convert_trace_request_to_spans(
                 .iter()
                 .map(|kv| {
                     let value = kv.value.as_ref().and_then(|v| match &v.value {
-                        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s)) => {
-                            Some(opentelemetry::Value::String(s.clone().into()))
-                        }
-                        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(i)) => {
-                            Some(opentelemetry::Value::I64(*i))
-                        }
-                        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(d)) => {
-                            Some(opentelemetry::Value::F64(*d))
-                        }
-                        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(b)) => {
-                            Some(opentelemetry::Value::Bool(*b))
-                        }
-                    _ => None,
-                });
-                KeyValue::new(kv.key.clone(), value.unwrap_or(opentelemetry::Value::String("".to_string().into())))
+                        Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
+                                s,
+                            ),
+                        ) => Some(opentelemetry::Value::String(s.clone().into())),
+                        Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(i),
+                        ) => Some(opentelemetry::Value::I64(*i)),
+                        Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(
+                                d,
+                            ),
+                        ) => Some(opentelemetry::Value::F64(*d)),
+                        Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(b),
+                        ) => Some(opentelemetry::Value::Bool(*b)),
+                        _ => None,
+                    });
+                    KeyValue::new(
+                        kv.key.clone(),
+                        value.unwrap_or(opentelemetry::Value::String("".to_string().into())),
+                    )
                 })
                 .collect()
         } else {
@@ -174,27 +183,57 @@ pub(crate) fn convert_trace_request_to_spans(
                 }
 
                 let trace_id = TraceId::from_bytes([
-                    span.trace_id[0], span.trace_id[1], span.trace_id[2], span.trace_id[3],
-                    span.trace_id[4], span.trace_id[5], span.trace_id[6], span.trace_id[7],
-                    span.trace_id[8], span.trace_id[9], span.trace_id[10], span.trace_id[11],
-                    span.trace_id[12], span.trace_id[13], span.trace_id[14], span.trace_id[15],
+                    span.trace_id[0],
+                    span.trace_id[1],
+                    span.trace_id[2],
+                    span.trace_id[3],
+                    span.trace_id[4],
+                    span.trace_id[5],
+                    span.trace_id[6],
+                    span.trace_id[7],
+                    span.trace_id[8],
+                    span.trace_id[9],
+                    span.trace_id[10],
+                    span.trace_id[11],
+                    span.trace_id[12],
+                    span.trace_id[13],
+                    span.trace_id[14],
+                    span.trace_id[15],
                 ]);
 
                 let span_id = SpanId::from_bytes([
-                    span.span_id[0], span.span_id[1], span.span_id[2], span.span_id[3],
-                    span.span_id[4], span.span_id[5], span.span_id[6], span.span_id[7],
+                    span.span_id[0],
+                    span.span_id[1],
+                    span.span_id[2],
+                    span.span_id[3],
+                    span.span_id[4],
+                    span.span_id[5],
+                    span.span_id[6],
+                    span.span_id[7],
                 ]);
 
                 let parent_span_id = if span.parent_span_id.len() == 8 {
                     SpanId::from_bytes([
-                        span.parent_span_id[0], span.parent_span_id[1], span.parent_span_id[2], span.parent_span_id[3],
-                        span.parent_span_id[4], span.parent_span_id[5], span.parent_span_id[6], span.parent_span_id[7],
+                        span.parent_span_id[0],
+                        span.parent_span_id[1],
+                        span.parent_span_id[2],
+                        span.parent_span_id[3],
+                        span.parent_span_id[4],
+                        span.parent_span_id[5],
+                        span.parent_span_id[6],
+                        span.parent_span_id[7],
                     ])
                 } else {
                     SpanId::INVALID
                 };
 
-                let span_context = SpanContext::new(trace_id, span_id, TraceFlags::default(), false, TraceState::default());
+                let span_context = SpanContext::new(
+                    trace_id,
+                    span_id,
+                    TraceFlags::default(),
+                    false,
+                    TraceState::default(),
+                );
 
                 // Convert span kind
                 let span_kind = match span.kind {
@@ -214,18 +253,22 @@ pub(crate) fn convert_trace_request_to_spans(
                 let mut attributes = resource_attrs.clone();
                 for attr in &span.attributes {
                     let value = attr.value.as_ref().and_then(|v| match &v.value {
-                        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s)) => {
-                            Some(opentelemetry::Value::String(s.clone().into()))
-                        }
-                        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(i)) => {
-                            Some(opentelemetry::Value::I64(*i))
-                        }
-                        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(d)) => {
-                            Some(opentelemetry::Value::F64(*d))
-                        }
-                        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(b)) => {
-                            Some(opentelemetry::Value::Bool(*b))
-                        }
+                        Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
+                                s,
+                            ),
+                        ) => Some(opentelemetry::Value::String(s.clone().into())),
+                        Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(i),
+                        ) => Some(opentelemetry::Value::I64(*i)),
+                        Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(
+                                d,
+                            ),
+                        ) => Some(opentelemetry::Value::F64(*d)),
+                        Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(b),
+                        ) => Some(opentelemetry::Value::Bool(*b)),
                         _ => None,
                     });
                     if let Some(val) = value {
@@ -252,8 +295,7 @@ pub(crate) fn convert_trace_request_to_spans(
                         .with_version(scope.version.clone())
                         .build()
                 } else {
-                    opentelemetry::InstrumentationScope::builder("unknown")
-                        .build()
+                    opentelemetry::InstrumentationScope::builder("unknown").build()
                 };
 
                 let span_data = SpanData {
@@ -293,7 +335,7 @@ pub(crate) fn convert_metrics_request_to_resource_metrics(
 
     // Convert the first ResourceMetrics (simplified - full implementation would handle all)
     let resource_metric = &req.resource_metrics[0];
-    
+
     // Extract resource attributes (preserved for future use when ResourceMetrics construction is available)
     let _resource_attrs = if let Some(ref resource) = resource_metric.resource {
         resource
@@ -301,18 +343,18 @@ pub(crate) fn convert_metrics_request_to_resource_metrics(
             .iter()
             .filter_map(|kv| {
                 let value = kv.value.as_ref().and_then(|v| match &v.value {
-                    Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s)) => {
-                        Some(opentelemetry::Value::String(s.clone().into()))
-                    }
+                    Some(
+                        opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s),
+                    ) => Some(opentelemetry::Value::String(s.clone().into())),
                     Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(i)) => {
                         Some(opentelemetry::Value::I64(*i))
                     }
-                    Some(opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(d)) => {
-                        Some(opentelemetry::Value::F64(*d))
-                    }
-                    Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(b)) => {
-                        Some(opentelemetry::Value::Bool(*b))
-                    }
+                    Some(
+                        opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(d),
+                    ) => Some(opentelemetry::Value::F64(*d)),
+                    Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(
+                        b,
+                    )) => Some(opentelemetry::Value::Bool(*b)),
                     _ => None,
                 });
                 value.map(|val| KeyValue::new(kv.key.clone(), val))
@@ -332,4 +374,3 @@ pub(crate) fn convert_metrics_request_to_resource_metrics(
 
     Ok(Some(resource_metrics))
 }
-

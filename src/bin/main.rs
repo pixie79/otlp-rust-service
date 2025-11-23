@@ -3,8 +3,8 @@
 //! Runs as a standalone service that receives OTLP messages via gRPC
 //! (both Protobuf and Arrow Flight) and writes them to Arrow IPC files.
 
+use otlp_arrow_library::otlp::{OtlpArrowFlightServer, OtlpGrpcServer};
 use otlp_arrow_library::{Config, OtlpLibrary};
-use otlp_arrow_library::otlp::{OtlpGrpcServer, OtlpArrowFlightServer};
 use std::net::SocketAddr;
 use tokio::io::AsyncWriteExt;
 use tracing::{error, info};
@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load configuration (for now, use defaults)
     let config = Config::default();
-    
+
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await?;
 
@@ -29,10 +29,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let protobuf_handle = if config.protocols.protobuf_enabled {
         let protobuf_addr: SocketAddr = format!("0.0.0.0:{}", config.protocols.protobuf_port)
             .parse()
-            .map_err(|e| format!("Invalid Protobuf port {}: {}", config.protocols.protobuf_port, e))?;
-        
+            .map_err(|e| {
+                format!(
+                    "Invalid Protobuf port {}: {}",
+                    config.protocols.protobuf_port, e
+                )
+            })?;
+
         let protobuf_server = OtlpGrpcServer::new(file_exporter.clone());
-        
+
         info!("Starting gRPC Protobuf server on {}", protobuf_addr);
         Some(tokio::spawn(async move {
             if let Err(e) = protobuf_server.start(protobuf_addr).await {
@@ -46,12 +51,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start gRPC Arrow Flight server if enabled
     let arrow_flight_handle = if config.protocols.arrow_flight_enabled {
-        let arrow_flight_addr: SocketAddr = format!("0.0.0.0:{}", config.protocols.arrow_flight_port)
-            .parse()
-            .map_err(|e| format!("Invalid Arrow Flight port {}: {}", config.protocols.arrow_flight_port, e))?;
-        
+        let arrow_flight_addr: SocketAddr =
+            format!("0.0.0.0:{}", config.protocols.arrow_flight_port)
+                .parse()
+                .map_err(|e| {
+                    format!(
+                        "Invalid Arrow Flight port {}: {}",
+                        config.protocols.arrow_flight_port, e
+                    )
+                })?;
+
         let arrow_flight_server = OtlpArrowFlightServer::new(file_exporter.clone());
-        
+
         info!("Starting gRPC Arrow Flight server on {}", arrow_flight_addr);
         Some(tokio::spawn(async move {
             if let Err(e) = arrow_flight_server.start(arrow_flight_addr).await {
@@ -65,10 +76,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("OTLP Arrow Service started");
     if config.protocols.protobuf_enabled {
-        info!("  - gRPC Protobuf: listening on port {}", config.protocols.protobuf_port);
+        info!(
+            "  - gRPC Protobuf: listening on port {}",
+            config.protocols.protobuf_port
+        );
     }
     if config.protocols.arrow_flight_enabled {
-        info!("  - gRPC Arrow Flight: listening on port {}", config.protocols.arrow_flight_port);
+        info!(
+            "  - gRPC Arrow Flight: listening on port {}",
+            config.protocols.arrow_flight_port
+        );
     }
     info!("Listening for OTLP messages...");
 
@@ -78,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
         let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
         info!("Health check endpoint listening on {}", addr);
-        
+
         loop {
             match listener.accept().await {
                 Ok((mut stream, _)) => {
@@ -95,9 +112,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Keep the service running
     tokio::signal::ctrl_c().await?;
-    
+
     info!("Shutting down...");
-    
+
     // Abort server tasks
     if let Some(handle) = protobuf_handle {
         handle.abort();
@@ -106,9 +123,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         handle.abort();
     }
     health_handle.abort();
-    
+
     library.shutdown().await?;
 
     Ok(())
 }
-
