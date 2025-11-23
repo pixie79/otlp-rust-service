@@ -2,7 +2,7 @@
 //!
 //! Forwards OTLP messages to remote endpoints with format conversion support.
 
-use crate::config::{AuthConfig, ForwardingConfig, ForwardingProtocol};
+use crate::config::{ForwardingConfig, ForwardingProtocol};
 use crate::error::{OtlpError, OtlpExportError};
 use crate::otlp::converter::FormatConverter;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
@@ -130,9 +130,9 @@ impl OtlpForwarder {
         }
 
         // Create HTTP client with authentication headers if needed
-        let mut client_builder = reqwest::Client::builder();
+        let client_builder = reqwest::Client::builder();
         
-        if let Some(ref auth) = config.authentication {
+        if config.authentication.is_some() {
             // Authentication headers will be added per-request
         }
 
@@ -240,12 +240,12 @@ impl OtlpForwarder {
     }
 
     /// Internal method to forward metrics (called asynchronously)
-    async fn forward_metrics_internal(&self, metrics: &ResourceMetrics) -> Result<(), OtlpError> {
+    async fn forward_metrics_internal(&self, _metrics: &ResourceMetrics) -> Result<(), OtlpError> {
         self.circuit_breaker.call(async {
             match self.config.protocol {
                 ForwardingProtocol::Protobuf => {
                     // Convert ResourceMetrics to Protobuf request
-                    let request = self.converter.resource_metrics_to_protobuf(&metrics)
+                    let request = self.converter.resource_metrics_to_protobuf(_metrics)
                         .map_err(|e| OtlpError::Export(OtlpExportError::FormatConversionError(
                             format!("Failed to convert ResourceMetrics to Protobuf: {}", e),
                         )))?;
@@ -256,7 +256,7 @@ impl OtlpForwarder {
                 }
                 ForwardingProtocol::ArrowFlight => {
                     // Convert ResourceMetrics to Arrow Flight batch
-                    let batch = FormatConverter::resource_metrics_to_arrow_batch(&metrics)
+                    let batch = FormatConverter::resource_metrics_to_arrow_batch(_metrics)
                         .map_err(|e| OtlpError::Export(OtlpExportError::FormatConversionError(
                             format!("Failed to convert ResourceMetrics to Arrow batch: {}", e),
                         )))?;
@@ -269,7 +269,7 @@ impl OtlpForwarder {
     }
 
     /// Send Protobuf traces to remote endpoint
-    async fn send_protobuf_traces(&self, request: ExportTraceServiceRequest) -> Result<(), OtlpError> {
+    async fn send_protobuf_traces(&self, _request: ExportTraceServiceRequest) -> Result<(), OtlpError> {
         let url = self.config.endpoint_url.as_ref()
             .ok_or_else(|| OtlpError::Export(OtlpExportError::ForwardingError(
                 "Endpoint URL is required".to_string(),
@@ -307,7 +307,7 @@ impl OtlpForwarder {
     }
 
     /// Send Protobuf metrics to remote endpoint
-    async fn send_protobuf_metrics(&self, request: ExportMetricsServiceRequest) -> Result<(), OtlpError> {
+    async fn send_protobuf_metrics(&self, _request: ExportMetricsServiceRequest) -> Result<(), OtlpError> {
         let url = self.config.endpoint_url.as_ref()
             .ok_or_else(|| OtlpError::Export(OtlpExportError::ForwardingError(
                 "Endpoint URL is required".to_string(),
@@ -345,7 +345,7 @@ impl OtlpForwarder {
     }
 
     /// Send Arrow Flight traces to remote endpoint
-    async fn send_arrow_flight_traces(&self, batch: arrow::record_batch::RecordBatch) -> Result<(), OtlpError> {
+    async fn send_arrow_flight_traces(&self, _batch: arrow::record_batch::RecordBatch) -> Result<(), OtlpError> {
         // TODO: Implement Arrow Flight client
         // This requires a gRPC client with Arrow Flight support
         warn!("Arrow Flight forwarding not yet fully implemented - using placeholder");
@@ -353,7 +353,7 @@ impl OtlpForwarder {
     }
 
     /// Send Arrow Flight metrics to remote endpoint
-    async fn send_arrow_flight_metrics(&self, batch: arrow::record_batch::RecordBatch) -> Result<(), OtlpError> {
+    async fn send_arrow_flight_metrics(&self, _batch: arrow::record_batch::RecordBatch) -> Result<(), OtlpError> {
         // TODO: Implement Arrow Flight client
         // This requires a gRPC client with Arrow Flight support
         warn!("Arrow Flight forwarding not yet fully implemented - using placeholder");

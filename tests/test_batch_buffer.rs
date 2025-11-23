@@ -131,9 +131,9 @@ async fn test_batch_buffer_should_write() {
     let buffer = BatchBuffer::new(1); // 1 second interval
     
     // Initially should not write (just created)
-    let should_write = buffer.should_write().await;
+    let _should_write = buffer.should_write().await;
     // This might be true or false depending on timing, so we'll just verify the method works
-    assert!(should_write || !should_write, "should_write should return a boolean");
+    // (The method returns a boolean, which is verified by the type system)
     
     // Update last write time
     buffer.update_last_write().await;

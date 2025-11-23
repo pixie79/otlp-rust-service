@@ -167,7 +167,7 @@ impl FormatConverter {
         // Note: We need to reconstruct the Protobuf request from spans
         // This is a simplified conversion - in a full implementation, we'd need
         // to properly reconstruct ResourceSpans with all metadata
-        let mut request = ExportTraceServiceRequest::default();
+        let request = ExportTraceServiceRequest::default();
         
         // For now, we create a minimal request
         // A full implementation would need to properly group spans by resource and scope
@@ -204,7 +204,7 @@ impl FormatConverter {
         // Convert ResourceMetrics to Protobuf request
         // Note: We need to reconstruct the Protobuf request from ResourceMetrics
         // This is a simplified conversion
-        let mut request = ExportMetricsServiceRequest::default();
+        let request = ExportMetricsServiceRequest::default();
         
         warn!("Arrow Flight to Protobuf metrics conversion: Simplified implementation - full metadata reconstruction not yet implemented");
         
@@ -227,7 +227,7 @@ impl FormatConverter {
 
         // Create a minimal Protobuf request
         // Full implementation would properly group spans by resource and scope
-        let mut request = ExportTraceServiceRequest::default();
+        let request = ExportTraceServiceRequest::default();
         
         warn!("Spans to Protobuf conversion: Simplified implementation - full metadata reconstruction not yet implemented");
         
@@ -242,7 +242,7 @@ impl FormatConverter {
         metrics: &ResourceMetrics,
     ) -> Result<Option<ExportMetricsServiceRequest>, OtlpError> {
         // Create a minimal Protobuf request
-        let mut request = ExportMetricsServiceRequest::default();
+        let request = ExportMetricsServiceRequest::default();
         
         warn!("ResourceMetrics to Protobuf conversion: Simplified implementation - full metadata reconstruction not yet implemented");
         
@@ -374,12 +374,13 @@ impl FormatConverter {
     /// Note: ResourceMetrics fields are private in opentelemetry-sdk 0.31, so we use
     /// a simplified approach. For full implementation, we'd need to use opentelemetry-proto
     /// conversion utilities or access metrics through public APIs.
-    pub(crate) fn resource_metrics_to_arrow_batch(metrics: &ResourceMetrics) -> Result<RecordBatch, anyhow::Error> {
+    pub(crate) fn resource_metrics_to_arrow_batch(_metrics: &ResourceMetrics) -> Result<RecordBatch, anyhow::Error> {
         use arrow::array::*;
         use arrow::datatypes::*;
         use std::sync::Arc;
 
         // Since ResourceMetrics fields are private, we create a minimal empty batch
+        let _ = _metrics; // Acknowledge parameter for future use
         // Full implementation would require proper access to metrics data
         // This is a placeholder that creates the correct schema structure
         let schema = Schema::new(vec![
