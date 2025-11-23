@@ -110,6 +110,7 @@ An operator needs to forward collected telemetry data to a remote OTLP endpoint 
 - Q: Which protocols should be enabled by default when the library starts? → A: Both protocols enabled by default
 - Q: Should the mock service support both gRPC protocols for testing? → A: Support both protocols - mock service accepts messages via both Protobuf and Arrow Flight gRPC
 - Q: How should forwarding handle format selection and conversion? → A: Forwarding service must allow selecting output format (gRPC Protobuf or gRPC Arrow Flight) via config. If original records are in a different format, they must be converted to the selected output format
+- Q: What is the minimum supported Python version? → A: Python 3.11
 
 ## Requirements *(mandatory)*
 
@@ -117,6 +118,7 @@ An operator needs to forward collected telemetry data to a remote OTLP endpoint 
 
 - **FR-001**: Library MUST be usable as both a standalone service and as an embedded library with public API methods
 - **FR-001a**: Public API methods MUST be callable from both Rust projects (native Rust API) and Python projects (via Python bindings/FFI, e.g., PyO3)
+- **FR-001b**: Python bindings MUST support Python 3.11 or higher
 - **FR-002**: Library MUST receive OTLP messages using gRPC with Protobuf protocol (standard OTLP)
 - **FR-002a**: Library MUST receive OTLP messages using gRPC with Arrow Flight IPC protocol (OTAP)
 - **FR-002b**: Library MUST support both gRPC protocols simultaneously on different ports/endpoints
@@ -166,7 +168,7 @@ An operator needs to forward collected telemetry data to a remote OTLP endpoint 
 - **SC-003**: Output files are readable and parseable as Arrow IPC Streaming format by standard Arrow libraries
 - **SC-004**: Library can be integrated into another application via public API methods within 15 minutes of setup
 - **SC-004a**: Public API methods can be called from Rust projects using native Rust API
-- **SC-004b**: Public API methods can be called from Python projects using Python bindings (e.g., PyO3)
+- **SC-004b**: Public API methods can be called from Python projects using Python bindings (e.g., PyO3) with Python 3.11 or higher
 - **SC-005**: Configuration changes take effect without requiring code modifications or recompilation
 - **SC-006**: When forwarding is enabled, messages are successfully forwarded to remote endpoints with at least 99% success rate under normal network conditions, with format conversion (Protobuf ↔ Arrow Flight) performed automatically when needed
 - **SC-007**: File cleanup operations remove files older than configured intervals with 100% accuracy

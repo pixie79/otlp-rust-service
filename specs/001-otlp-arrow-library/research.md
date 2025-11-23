@@ -266,6 +266,7 @@
 - Provide Pythonic error handling (raise exceptions)
 - Support both sync and async usage patterns
 - Provide type hints for better IDE support
+- Minimum Python version: 3.11
 
 **References**:
 - PyO3 documentation: https://pyo3.rs/

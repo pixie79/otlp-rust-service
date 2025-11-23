@@ -237,7 +237,7 @@
 
 ## Phase 7: Python Bindings (Priority: P5)
 
-**Goal**: Enable Python projects to call public API methods via Python bindings using PyO3
+**Goal**: Enable Python projects to call public API methods via Python bindings using PyO3 (Python 3.11+ required)
 
 **Independent Test**: Import Python module, create OtlpLibrary instance, call export methods from Python, and verify messages are processed and stored correctly
 
@@ -245,7 +245,7 @@
 
 - [x] T126 [P] [US5] Python unit test for library initialization in tests/python/test_library_init.py
 - [x] T127 [P] [US5] Python unit test for trace export in tests/python/test_trace_export.py
-- [x] T128 [P] [P] [US5] Python unit test for metrics export in tests/python/test_metrics_export.py
+- [x] T128 [P] [US5] Python unit test for metrics export in tests/python/test_metrics_export.py
 - [x] T129 [P] [US5] Python integration test for end-to-end usage in tests/python/test_integration.py
 
 ### Implementation for Python Bindings
@@ -259,7 +259,7 @@
 - [x] T136 [US5] Implement Python bindings for OtlpLibrary::flush in src/python/bindings.rs
 - [x] T137 [US5] Implement Python bindings for OtlpLibrary::shutdown in src/python/bindings.rs
 - [x] T138 [US5] Implement Python error handling (convert Rust errors to Python exceptions) in src/python/bindings.rs
-- [x] T139 [US5] Configure maturin build system for Python wheel generation in pyproject.toml
+- [x] T139 [US5] Configure maturin build system for Python wheel generation in pyproject.toml with requires-python = ">=3.11"
 - [x] T140 [US5] Add Python module export in src/lib.rs
 - [x] T141 [US5] Create Python usage examples in examples/python_example.py
 

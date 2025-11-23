@@ -5,6 +5,20 @@ All notable changes to the OTLP Arrow Flight Library will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Python Minimum Version**: Updated minimum supported Python version from 3.8 to 3.11
+  - Updated `pyproject.toml` to require Python 3.11+
+  - Updated specification, plan, and research documents to reflect Python 3.11 requirement
+  - Updated agent context configuration
+
+### Documentation
+- Updated specification with Python 3.11 clarification
+- Updated implementation plan with Python 3.11 requirement
+- Updated research document with Python 3.11 minimum version
+- Updated tasks.md with Python 3.11 requirement in Phase 7
+
 ## [0.1.0] - 2024-11-23
 
 ### Added

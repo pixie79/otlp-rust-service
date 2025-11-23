@@ -1,6 +1,6 @@
 # Implementation Plan: OTLP Arrow Flight Library
 
-**Branch**: `001-otlp-arrow-library` | **Date**: 2024-11-23 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-otlp-arrow-library` | **Date**: 2024-12-19 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/001-otlp-arrow-library/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
@@ -11,46 +11,38 @@ Build a cross-platform Rust library that receives OTLP (OpenTelemetry Protocol) 
 
 ## Technical Context
 
-**Language/Version**: Rust stable channel (latest stable, minimum 1.75+)  
+**Language/Version**: Rust stable (latest), Python 3.11+  
 **Primary Dependencies**: 
-- `opentelemetry` (0.31) - OTLP protocol support
-- `opentelemetry-sdk` (0.31) - SDK implementation
-- `opentelemetry-otlp` (0.31) - OTLP exporter with gRPC Protobuf support
-- `opentelemetry-proto` (0.31) - OTLP protobuf definitions
-- `otel-arrow` (latest) - Arrow Flight IPC protocol implementation (OTAP) and format conversion
-- `arrow` (57) - Arrow IPC format support
-- `arrow-array` (57) - Arrow array types
+- `opentelemetry` (0.31), `opentelemetry-sdk` (0.31), `opentelemetry-otlp` (0.31), `opentelemetry-proto` (0.31) - OpenTelemetry SDK and OTLP support
+- `arrow` (57), `arrow-array` (57), `arrow-flight` (57) - Apache Arrow IPC and Flight IPC
 - `tokio` (1.35+) - Async runtime
-- `tonic` (0.14) - gRPC framework (must match opentelemetry-proto version)
-- `serde` (1.0) - Serialization
-- `serde_yaml` (0.9) - YAML configuration
-- `anyhow` (1.0) - Error handling
+- `tonic` (0.14) - gRPC framework
+- `serde` (1.0), `serde_yaml` (0.9) - Serialization/configuration
+- `pyo3` (0.20) - Python bindings (FFI for Python support)
+- `anyhow` (1.0), `thiserror` (1.0) - Error handling
 - `tracing` (0.1) - Structured logging
-- `pyo3` (0.20+) - Python bindings (FFI for Python support)
 
 **Storage**: Local filesystem (Arrow IPC Streaming format files)  
 **Testing**: `cargo test` with unit, integration, and contract tests. Mock service for end-to-end testing supporting both gRPC protocols. Python tests using pytest for Python bindings.  
 **Target Platform**: Cross-platform (Windows, Linux, macOS)  
 **Project Type**: Rust library (can be used standalone or embedded) with Python bindings  
 **Performance Goals**: 
-- Receive and store 1000+ OTLP messages per second
-- p95 latency < 100ms from message receipt to batch write initiation
-- Support both protocols simultaneously without performance degradation
-- Format conversion during forwarding should not significantly impact throughput
+- At least 1000 OTLP messages per second without data loss
+- p95 latency < 100ms (message receipt to batch write initiation)
+- Batch writes every 5 seconds (default, configurable)
 
 **Constraints**: 
-- Minimum 85% code coverage per file (constitution requirement)
-- TDD mandatory for all new features
+- Minimum Python version: 3.11
+- Minimum code coverage: 85% per file
 - All code must pass `cargo clippy` with no warnings
-- Cross-platform compatibility required
-- Both protocols must be supported simultaneously
-- Format conversion must preserve data integrity and ordering
+- TDD mandatory for all new features
 
 **Scale/Scope**: 
-- Library must handle high-throughput OTLP ingestion (1000+ msg/sec)
-- Support both Protobuf and Arrow Flight protocols concurrently
-- Configurable output directory, write intervals, and cleanup schedules
-- Optional remote forwarding with configurable protocol per endpoint and automatic format conversion
+- Single Rust library project with modular organization
+- Source code organized by domain (config, otlp, api, mock, python)
+- Test structure mirrors source organization
+- Python bindings in separate `src/python/` module using PyO3
+- Standalone service binary in `src/bin/`
 
 ## Constitution Check
 
@@ -58,17 +50,13 @@ Build a cross-platform Rust library that receives OTLP (OpenTelemetry Protocol) 
 
 Verify compliance with OTLP Rust Service Constitution principles:
 
-- **Code Quality (I)**: ✅ Design follows Rust best practices with clear module separation, SOLID principles, and comprehensive documentation. Complexity managed through modular architecture (config, otlp, api, mock modules). Format conversion logic isolated in dedicated conversion module. All public APIs documented with examples.
-
-- **Testing Standards (II)**: ✅ Testing strategy defined with TDD mandatory approach. Test types planned: unit tests (fast, isolated), integration tests (gRPC endpoints, file I/O, format conversion), contract tests (OTLP protocol compliance), and performance tests (latency, throughput, conversion overhead). Mock service enables end-to-end testing of both protocols and format conversion scenarios. Minimum 85% code coverage per file enforced.
-
+- **Code Quality (I)**: ✅ Design follows Rust best practices with modular organization, comprehensive documentation, and SOLID principles. Complexity managed through domain separation (config, otlp, api, mock, python modules).
+- **Testing Standards (II)**: ✅ Testing strategy defined with TDD mandatory. Coverage targets: 85% minimum per file. Test types: unit (fast, isolated), integration (external interfaces), contract (OTLP protocol compliance), performance (benchmarks). Mock service enables end-to-end testing without external dependencies.
 - **User Experience Consistency (III)**: ✅ API contracts defined for both Rust and Python APIs. Error formats standardized via custom error types (OtlpError, OtlpConfigError, etc.). Configuration patterns consistent (YAML, env vars, programmatic API with OTLP_* prefix). Format conversion transparent to users (automatic based on forwarding config). Logging structured using tracing crate.
+- **Performance Requirements (IV)**: ✅ SLOs defined: 1000 msg/s throughput, p95 latency < 100ms, batch writes every 5s. Performance targets measurable via benchmarks. Async operations for I/O-bound tasks. Resource cleanup via RAII patterns.
+- **Observability & Reliability (V)**: ✅ Structured logging via tracing crate. Metrics collection planned for critical operations. Health check endpoints for standalone service. Error handling graceful without message loss. Circuit breakers for remote forwarding.
 
-- **Performance Requirements (IV)**: ✅ SLOs defined: 1000+ messages/sec, p95 latency < 100ms. Performance targets measurable via integration tests and benchmarks. Format conversion overhead measured and optimized. Async I/O used throughout (tokio). Resource cleanup via RAII patterns. Performance regressions caught by CI/CD benchmarks.
-
-- **Observability & Reliability (V)**: ✅ Structured logging via tracing crate with appropriate log levels. Format conversion operations logged for debugging. Metrics can be exposed via Prometheus-compatible endpoints (future enhancement). Health check endpoints planned for standalone service. Error rates and latency tracked. Graceful degradation for forwarding failures (doesn't block local storage). Format conversion errors handled gracefully.
-
-**Post-Phase 1 Re-check**: All principles remain compliant. Dual protocol support and format conversion add complexity but are justified by specification requirements and provide backward compatibility and flexibility.
+Any violations or exceptions MUST be documented in the Complexity Tracking section below.
 
 ## Project Structure
 
@@ -81,7 +69,7 @@ specs/001-otlp-arrow-library/
 ├── data-model.md        # Phase 1 output (/speckit.plan command)
 ├── quickstart.md        # Phase 1 output (/speckit.plan command)
 ├── contracts/           # Phase 1 output (/speckit.plan command)
-│   ├── grpc-api.md      # gRPC API contracts (Protobuf and Arrow Flight)
+│   ├── grpc-api.md      # gRPC API contract
 │   ├── public-api.md    # Rust public API contract
 │   └── python-api.md    # Python API contract
 └── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
@@ -95,44 +83,57 @@ src/
 ├── error.rs             # Custom error types
 ├── config/              # Configuration management
 │   ├── mod.rs
-│   ├── types.rs         # Configuration structs
-│   └── loader.rs        # Configuration loading (YAML, env vars, programmatic)
-├── otlp/                # OTLP processing
-│   ├── mod.rs           # Module exports
-│   ├── batch_writer.rs  # Batch buffering for writes
-│   ├── exporter.rs      # Arrow IPC file exporter
-│   ├── server.rs        # gRPC server (Protobuf)
-│   ├── server_arrow.rs  # Arrow Flight server (OTAP)
-│   ├── forwarder.rs     # Remote forwarding with format conversion
-│   └── converter.rs    # Format conversion (Protobuf ↔ Arrow Flight)
+│   ├── types.rs         # Config, ForwardingConfig, AuthConfig, ProtocolConfig
+│   └── loader.rs        # YAML, env vars, programmatic loading
+├── otlp/                # OTLP protocol handling
+│   ├── mod.rs
+│   ├── server.rs        # gRPC Protobuf server
+│   ├── server_arrow.rs  # gRPC Arrow Flight server
+│   ├── exporter.rs      # File-based exporter (Arrow IPC)
+│   ├── batch_writer.rs  # Batch writing logic
+│   ├── converter.rs     # Format conversion (Protobuf ↔ Arrow Flight)
+│   └── forwarder.rs     # Remote forwarding with format conversion
 ├── api/                 # Public API
 │   ├── mod.rs
-│   └── public.rs        # OtlpLibrary struct and methods
-├── python/              # Python bindings (PyO3)
+│   └── public.rs        # OtlpLibrary struct and public methods
+├── mock/                 # Mock service for testing
 │   ├── mod.rs
-│   └── bindings.rs      # PyO3 bindings
-├── mock/                # Mock service for testing
+│   └── service.rs       # In-memory mock OTLP service
+├── python/               # Python bindings (PyO3)
 │   ├── mod.rs
-│   └── service.rs       # MockOtlpService (supports both protocols)
-└── bin/                 # Standalone service binary
-    └── main.rs          # otlp-arrow-service binary
+│   └── bindings.rs      # PyO3 bindings for OtlpLibrary
+└── bin/                  # Standalone service binary
+    └── main.rs           # Main entry point for standalone mode
 
 tests/
-├── unit/                # Unit tests
+├── unit/                 # Unit tests (fast, isolated)
 │   ├── config/
 │   ├── otlp/
-│   │   ├── converter.rs # Format conversion unit tests
-│   │   └── forwarder.rs # Forwarding unit tests
-│   └── api/
-├── integration/         # Integration tests
-│   ├── test_grpc_protobuf_ingestion.rs
-│   ├── test_grpc_arrow_flight_ingestion.rs
-│   ├── test_public_api_traces.rs
-│   ├── test_public_api_metrics.rs
-│   ├── test_file_writing.rs
-│   └── test_format_conversion.rs # Format conversion integration tests
-└── contract/            # Contract tests
-    └── test_otlp_protocol.rs
+│   ├── api/
+│   └── mock/
+├── integration/         # Integration tests (external interfaces)
+│   ├── test_grpc_protobuf_*.rs
+│   ├── test_grpc_arrow_flight_*.rs
+│   ├── test_forwarding_*.rs
+│   ├── test_mock_service_*.rs
+│   └── test_public_api_*.rs
+├── contract/            # Contract tests (OTLP protocol compliance)
+│   └── test_otlp_protocol.rs
+├── bench/               # Performance benchmarks
+│   ├── bench_throughput.rs
+│   ├── bench_latency.rs
+│   └── bench_format_conversion.rs
+├── python/              # Python tests
+│   ├── test_library_init.py
+│   ├── test_trace_export.py
+│   ├── test_metrics_export.py
+│   └── test_integration.py
+└── test_*.rs            # Root-level unit tests
+
+examples/
+├── standalone.rs        # Standalone service example
+├── embedded.rs          # Embedded library example
+└── python_example.py    # Python usage example
 ```
 
 **Structure Decision**: Single Rust library project with modular organization. Source code organized by domain (config, otlp, api, mock, python). Format conversion logic isolated in dedicated `converter.rs` module within `otlp/` for maintainability. Test structure mirrors source organization with unit, integration, and contract test categories. Python bindings in separate `src/python/` module using PyO3. Standalone service binary in `src/bin/`.
@@ -143,7 +144,7 @@ tests/
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Dual gRPC server implementation | Specification requires both Protobuf and Arrow Flight protocols | Single protocol insufficient - breaks backward compatibility and doesn't meet spec requirements |
-| Separate Arrow Flight server module | otel-arrow crate integration requires separate server implementation | Combining with Protobuf server would create tight coupling and violate separation of concerns |
-| Format conversion module | Specification requires forwarding with format selection and automatic conversion | No conversion would limit forwarding flexibility - users must match input/output formats manually |
-| Mock service dual protocol support | Testing requirements mandate validation of both integration paths | Single protocol mock service would not validate complete system behavior |
+| Dual protocol support (Protobuf + Arrow Flight) | Specification requires both protocols simultaneously | Single protocol insufficient - need backward compatibility (Protobuf) and performance (Arrow Flight) |
+| Format conversion (Protobuf ↔ Arrow Flight) | Forwarding must support configurable output format regardless of input | Single format forwarding insufficient - users need flexibility to forward to different endpoint types |
+| Python bindings (PyO3) | Specification requires public API callable from Python projects | Rust-only API insufficient - specification explicitly requires Python support |
+| Mock service | End-to-end testing requires validation of both gRPC and public API paths | External OTLP service dependencies insufficient - need reliable, repeatable testing without network dependencies |
