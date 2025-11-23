@@ -4,7 +4,7 @@
 //! at configurable intervals using Arrow IPC Streaming format.
 
 use crate::error::OtlpError;
-use opentelemetry_sdk::metrics::data::ResourceMetrics;
+use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_sdk::trace::SpanData;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,8 +15,8 @@ use tokio::sync::Mutex;
 pub struct BatchBuffer {
     /// Buffered trace spans
     traces: Arc<Mutex<Vec<SpanData>>>,
-    /// Buffered metrics
-    metrics: Arc<Mutex<Vec<ResourceMetrics>>>,
+    /// Buffered metrics (stored as protobuf for Clone support)
+    metrics: Arc<Mutex<Vec<ExportMetricsServiceRequest>>>,
     /// Write interval in seconds
     write_interval: Duration,
     /// Last write timestamp
@@ -48,8 +48,14 @@ impl BatchBuffer {
         Ok(())
     }
 
-    /// Add metrics to the buffer
-    pub async fn add_metrics(&self, metrics: ResourceMetrics) -> Result<(), OtlpError> {
+    /// Add metrics to the buffer (protobuf format)
+    ///
+    /// Stores metrics as ExportMetricsServiceRequest (protobuf) which implements Clone,
+    /// solving the ResourceMetrics Clone limitation.
+    pub async fn add_metrics_protobuf(
+        &self,
+        metrics: ExportMetricsServiceRequest,
+    ) -> Result<(), OtlpError> {
         let mut buffered_metrics = self.metrics.lock().await;
         buffered_metrics.push(metrics);
         Ok(())
@@ -62,7 +68,10 @@ impl BatchBuffer {
     }
 
     /// Take all buffered metrics (clears the buffer)
-    pub async fn take_metrics(&self) -> Vec<ResourceMetrics> {
+    ///
+    /// Returns metrics in protobuf format (ExportMetricsServiceRequest).
+    /// Convert to ResourceMetrics when needed for export.
+    pub async fn take_metrics(&self) -> Vec<ExportMetricsServiceRequest> {
         let mut metrics = self.metrics.lock().await;
         std::mem::take(&mut *metrics)
     }

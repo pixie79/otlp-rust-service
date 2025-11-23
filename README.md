@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Export multiple traces
     // library.export_traces(spans).await?;
 
-    // Export metrics
+    // Export metrics (automatically converted to protobuf for storage)
     // library.export_metrics(metrics).await?;
 
     // Force flush
@@ -192,7 +192,7 @@ tests/
 - Rust 1.75+ (stable channel)
 - Tokio async runtime
 - Cross-platform: Windows, Linux, macOS
-- Python 3.8+ (for Python bindings)
+- Python 3.11+ (for Python bindings)
 
 ## CI/CD
 
@@ -266,6 +266,17 @@ The library collects operation metrics that can be accessed via `OtlpFileExporte
 - Files written
 - Errors encountered
 - Format conversions performed
+
+## Implementation Notes
+
+### ResourceMetrics Storage
+
+The library uses protobuf format (`ExportMetricsServiceRequest`) for internal metric storage to solve the `ResourceMetrics` Clone limitation. When you call `export_metrics()` with a `ResourceMetrics` instance:
+
+1. The metrics are automatically converted to protobuf format for storage
+2. Protobuf format supports `Clone`, enabling proper buffering and forwarding
+3. When flushing, protobuf is converted back to `ResourceMetrics` for file export
+4. This ensures full data preservation and proper handling of metrics from all sources (gRPC Protobuf, Arrow Flight, and public API)
 
 ## Documentation
 

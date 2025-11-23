@@ -131,11 +131,27 @@ impl OtlpLibrary {
                         }
                     }
 
-                    // Take buffered metrics
-                    let metrics = batch_buffer_clone.take_metrics().await;
-                    for metric in metrics {
-                        if let Err(e) = file_exporter_clone.export_metrics(&metric).await {
-                            warn!("Failed to export metrics: {}", e);
+                    // Take buffered metrics (in protobuf format)
+                    let metrics_protobuf = batch_buffer_clone.take_metrics().await;
+                    for metric_request in metrics_protobuf {
+                        // Convert protobuf to ResourceMetrics for export
+                        match crate::otlp::server::convert_metrics_request_to_resource_metrics(
+                            &metric_request,
+                        ) {
+                            Ok(Some(metrics)) => {
+                                if let Err(e) = file_exporter_clone.export_metrics(&metrics).await {
+                                    warn!("Failed to export metrics: {}", e);
+                                }
+                            }
+                            Ok(None) => {
+                                // Empty metrics, skip
+                            }
+                            Err(e) => {
+                                warn!(
+                                    "Failed to convert protobuf metrics to ResourceMetrics: {}",
+                                    e
+                                );
+                            }
                         }
                     }
 
@@ -316,7 +332,15 @@ impl OtlpLibrary {
         &self,
         metrics: opentelemetry_sdk::metrics::data::ResourceMetrics,
     ) -> Result<(), OtlpError> {
-        self.batch_buffer.add_metrics(metrics).await
+        // Convert ResourceMetrics to protobuf for storage (ResourceMetrics doesn't implement Clone)
+        let converter = crate::otlp::converter::FormatConverter::new();
+        let protobuf_request = converter.resource_metrics_to_protobuf(&metrics)?;
+
+        if let Some(request) = protobuf_request {
+            self.batch_buffer.add_metrics_protobuf(request).await
+        } else {
+            Ok(()) // Empty metrics, nothing to store
+        }
     }
 
     /// Force immediate flush of all buffered messages to disk
@@ -351,9 +375,26 @@ impl OtlpLibrary {
             self.file_exporter.export_traces(traces).await?;
         }
 
-        let metrics = self.batch_buffer.take_metrics().await;
-        for metric in metrics {
-            self.file_exporter.export_metrics(&metric).await?;
+        // Take buffered metrics (in protobuf format) and convert to ResourceMetrics for export
+        let metrics_protobuf = self.batch_buffer.take_metrics().await;
+        for metric_request in metrics_protobuf {
+            match crate::otlp::server::convert_metrics_request_to_resource_metrics(&metric_request)
+            {
+                Ok(Some(metrics)) => {
+                    self.file_exporter.export_metrics(&metrics).await?;
+                }
+                Ok(None) => {
+                    // Empty metrics, skip
+                }
+                Err(e) => {
+                    return Err(OtlpError::Export(
+                        crate::error::OtlpExportError::FormatConversionError(format!(
+                            "Failed to convert protobuf metrics to ResourceMetrics: {}",
+                            e
+                        )),
+                    ));
+                }
+            }
         }
 
         // Flush file writers

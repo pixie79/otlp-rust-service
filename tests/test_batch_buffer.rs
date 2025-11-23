@@ -75,18 +75,18 @@ async fn test_batch_buffer_add_traces() {
     assert_eq!(count, 3, "Buffer should contain 3 traces");
 }
 
-// Note: Metrics tests are commented out until we can properly construct ResourceMetrics
-// ResourceMetrics has private fields and Resource constructors are private in opentelemetry-sdk 0.31
-// In production, metrics would come from the SDK's metric export
-/*
+// Note: Metrics are now stored as protobuf (ExportMetricsServiceRequest) to support Clone
 #[tokio::test]
 async fn test_batch_buffer_add_metrics() {
+    use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+
     let buffer = BatchBuffer::new(5);
 
-    let metrics = create_test_metrics();
+    // Create a minimal protobuf metrics request
+    let metrics_request = ExportMetricsServiceRequest::default();
 
-    // Add metrics
-    let result = buffer.add_metrics(metrics).await;
+    // Add metrics (protobuf format)
+    let result = buffer.add_metrics_protobuf(metrics_request).await;
     assert!(result.is_ok(), "Adding metrics should succeed");
 
     // Verify count
@@ -96,12 +96,14 @@ async fn test_batch_buffer_add_metrics() {
 
 #[tokio::test]
 async fn test_batch_buffer_take_metrics() {
+    use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+
     let buffer = BatchBuffer::new(5);
 
-    let metrics = create_test_metrics();
-    buffer.add_metrics(metrics).await.unwrap();
+    let metrics_request = ExportMetricsServiceRequest::default();
+    buffer.add_metrics_protobuf(metrics_request).await.unwrap();
 
-    // Take metrics (should clear buffer)
+    // Take metrics (should clear buffer, returns protobuf)
     let taken = buffer.take_metrics().await;
     assert_eq!(taken.len(), 1, "Should take 1 metric");
 
@@ -109,7 +111,6 @@ async fn test_batch_buffer_take_metrics() {
     let count = buffer.metric_count().await;
     assert_eq!(count, 0, "Buffer should be empty after take");
 }
-*/
 
 #[tokio::test]
 async fn test_batch_buffer_take_traces() {

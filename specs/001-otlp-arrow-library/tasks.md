@@ -288,6 +288,32 @@
 
 ---
 
+## Phase 9: ResourceMetrics Clone Issue Fix
+
+**Purpose**: Fix ResourceMetrics Clone limitation by storing protobuf format in buffer
+
+**Problem**: ResourceMetrics doesn't implement Clone, preventing proper buffering and forwarding. Currently using ResourceMetrics::default() as placeholder, losing actual metric data.
+
+**Solution**: Store ExportMetricsServiceRequest (protobuf) in batch buffer instead of ResourceMetrics. Convert to ResourceMetrics when needed for export/forwarding.
+
+- [x] T156 [P] [US1] Unit test for protobuf storage in batch buffer in tests/test_batch_buffer_protobuf.rs
+- [x] T157 [P] [US1] Integration test for metrics export with protobuf storage in tests/integration/test_metrics_protobuf_storage.rs
+- [x] T158 [P] [US1] Integration test for Arrow Flight metrics with protobuf storage in tests/integration/test_arrow_flight_metrics_protobuf.rs
+- [x] T159 [US1] Update BatchBuffer to store ExportMetricsServiceRequest instead of ResourceMetrics in src/otlp/batch_writer.rs
+- [x] T160 [US1] Implement add_metrics_protobuf method in BatchBuffer in src/otlp/batch_writer.rs
+- [x] T161 [US1] Update OtlpLibrary::export_metrics to convert ResourceMetrics to protobuf before storing in src/api/public.rs
+- [x] T162 [US1] Complete resource_metrics_to_protobuf conversion in src/otlp/converter.rs (currently returns default)
+- [x] T163 [US1] Complete arrow_flight_to_protobuf_metrics conversion in src/otlp/converter.rs (currently returns default)
+- [x] T164 [US1] Update OtlpFileExporter::export_metrics to accept protobuf and convert to ResourceMetrics when needed in src/otlp/exporter.rs
+- [x] T165 [US1] Update batch writer flush logic to convert protobuf to ResourceMetrics before file export in src/api/public.rs
+- [x] T166 [US1] Update Arrow Flight server to convert RecordBatch to protobuf before storing in buffer in src/otlp/server_arrow.rs
+- [x] T167 [US1] Update Protobuf server to store request directly in buffer (already protobuf) in src/otlp/server.rs
+- [x] T168 [US1] Update forwarder to work with protobuf storage (convert when needed) in src/otlp/forwarder.rs
+- [x] T169 [US1] Update Python bindings export_metrics to convert ResourceMetrics to protobuf in src/python/bindings.rs
+- [x] T170 [P] Integration test for end-to-end metrics flow with protobuf storage in tests/integration/test_metrics_protobuf_e2e.rs
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

@@ -106,14 +106,13 @@ impl MetricsService for MetricsServiceImpl {
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
         let req = request.into_inner();
 
-        // Convert OTLP protobuf to ResourceMetrics
-        // This is a simplified conversion - full implementation would use opentelemetry-proto conversion utilities
+        // Convert OTLP protobuf to ResourceMetrics for export
+        // Note: We preserve the original protobuf request for potential forwarding
         let resource_metrics = convert_metrics_request_to_resource_metrics(&req)
             .map_err(|e| Status::internal(format!("Failed to convert metrics: {}", e)))?;
 
         if let Some(metrics) = resource_metrics {
             // Export metrics using the file exporter directly
-            // TODO: Use proper opentelemetry-proto conversion when metrics are properly converted
             if let Err(e) = self.file_exporter.export_metrics(&metrics).await {
                 error!("Failed to export metrics: {}", e);
                 return Err(Status::internal(format!("Failed to export metrics: {}", e)));

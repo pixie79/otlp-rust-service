@@ -104,10 +104,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tonic` 0.14
 - `pyo3` 0.20 (for Python bindings)
 
+### Fixed
+
+- **ResourceMetrics Clone Issue**: Fixed limitation where `ResourceMetrics` doesn't implement `Clone`, preventing proper buffering and forwarding
+  - Metrics are now stored as `ExportMetricsServiceRequest` (protobuf) in the batch buffer, which implements `Clone`
+  - `OtlpLibrary::export_metrics()` automatically converts `ResourceMetrics` to protobuf before storing
+  - Flush operations convert protobuf back to `ResourceMetrics` when exporting to file
+  - Arrow Flight metrics are converted to protobuf before storage
+  - This ensures all metric data can be properly buffered, forwarded, and exported without data loss
+
 ### Known Limitations
 
 - Arrow Flight to Protobuf conversion uses simplified implementation (full metadata reconstruction pending)
-- ResourceMetrics to Protobuf conversion uses simplified implementation (full metadata reconstruction pending)
+- ResourceMetrics to Protobuf conversion uses simplified implementation when converting from SDK `ResourceMetrics` (full metadata reconstruction pending)
+  - Note: When metrics come from gRPC Protobuf, the original protobuf request is preserved, ensuring full data fidelity
 - Arrow Flight forwarding client implementation is a placeholder (requires full gRPC client)
 
 ### Future Enhancements

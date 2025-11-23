@@ -163,6 +163,25 @@ impl FlightService for OtlpFlightServiceImpl {
                     }
 
                     // Try to convert to metrics
+                    // Convert Arrow Flight batch to protobuf for storage (preserves data, supports Clone)
+                    let converter = crate::otlp::converter::FormatConverter::new();
+                    if let Ok(Some(protobuf_request)) =
+                        converter.arrow_flight_to_protobuf_metrics(&batch)
+                    {
+                        // Convert protobuf to ResourceMetrics for export
+                        if let Ok(Some(metrics)) =
+                            crate::otlp::server::convert_metrics_request_to_resource_metrics(
+                                &protobuf_request,
+                            )
+                        {
+                            if let Err(e) = file_exporter.export_metrics(&metrics).await {
+                                error!("Failed to export metrics from Arrow Flight: {}", e);
+                            }
+                        }
+                        continue;
+                    }
+
+                    // Fallback: try direct conversion (for backward compatibility)
                     if let Ok(Some(metrics)) = convert_arrow_batch_to_resource_metrics(&batch) {
                         if let Err(e) = file_exporter.export_metrics(&metrics).await {
                             error!("Failed to export metrics from Arrow Flight: {}", e);
