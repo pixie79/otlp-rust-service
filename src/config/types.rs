@@ -286,10 +286,10 @@ impl Config {
 /// - **Resilience**: Forwarding failures do not affect local storage
 /// - **Circuit Breaker**: Automatically stops forwarding after repeated failures
 ///
-/// # Example
-///
-/// ```no_run
-/// use otlp_arrow_library::{ForwardingConfig, ForwardingProtocol};
+    /// # Example
+    ///
+    /// ```no_run
+    /// use otlp_arrow_library::config::{ForwardingConfig, ForwardingProtocol};
 ///
 /// let forwarding = ForwardingConfig {
 ///     enabled: true,

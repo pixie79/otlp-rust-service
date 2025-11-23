@@ -55,9 +55,14 @@ jobs:
       - name: Run tests
         run: cargo test --all-features --workspace
       
-      - name: Run Python tests
+      - name: Build Python bindings
         run: |
           python3 -m pip install --upgrade pip
+          python3 -m pip install maturin
+          maturin develop --release
+      
+      - name: Run Python tests
+        run: |
           python3 -m pip install pytest
           if [ -f "tests/python/test_*.py" ]; then
             python3 -m pytest tests/python/ -v
@@ -89,9 +94,14 @@ jobs:
       - name: Run tests
         run: cargo test --all-features --workspace
       
-      - name: Run Python tests
+      - name: Build Python bindings
         run: |
           python3 -m pip install --upgrade pip
+          python3 -m pip install maturin
+          maturin develop --release
+      
+      - name: Run Python tests
+        run: |
           python3 -m pip install pytest
           if [ -f "tests/python/test_*.py" ]; then
             python3 -m pytest tests/python/ -v
