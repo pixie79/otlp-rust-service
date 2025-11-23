@@ -1,0 +1,24 @@
+# Clippy configuration for OTLP Rust Service
+# Enforces code quality standards per constitution
+
+# Deny warnings (fail build on warnings)
+deny-warnings = true
+
+# Performance lints
+avoid-breaking-exported-api = false
+msrv = "1.75"
+
+# Style
+doc-valid-idents = true
+empty-line-after-outer-attr = true
+
+# Correctness
+allow-attributes-inside-block = false
+
+# Complexity
+cyclomatic-complexity-threshold = 15
+
+# Pedantic
+# Enable pedantic lints for strict code quality
+# Note: Some pedantic lints may be too strict, adjust as needed
+

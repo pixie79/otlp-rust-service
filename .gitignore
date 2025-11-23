@@ -1,0 +1,43 @@
+# Rust
+target/
+debug/
+release/
+*.rs.bk
+*.rlib
+*.prof*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+*.log.*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Output directories
+output_dir/
+output/
+*.arrow
+*.pb
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Coverage
+coverage/
+*.lcov
+tarpaulin-report.html
+
+# Build artifacts
+Cargo.lock
+

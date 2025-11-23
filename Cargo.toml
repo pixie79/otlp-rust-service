@@ -1,0 +1,78 @@
+[package]
+name = "otlp-arrow-library"
+version = "0.1.0"
+edition = "2021"
+authors = ["OTLP Rust Service Team"]
+description = "Cross-platform Rust library for receiving OTLP messages via gRPC and writing to Arrow IPC files"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/your-org/otlp-rust-service"
+
+[dependencies]
+# OpenTelemetry
+opentelemetry = "0.31"
+opentelemetry_sdk = { version = "0.31", features = ["rt-tokio", "metrics", "trace"] }
+opentelemetry-otlp = { version = "0.31", features = ["metrics", "trace", "grpc-tonic"] }
+opentelemetry-proto = "0.31"
+
+# Arrow IPC
+arrow = "57"
+arrow-array = "57"
+arrow-flight = { version = "57", features = ["flight-sql-experimental"] }
+
+# Async runtime
+tokio = { version = "1.35", features = ["full", "time", "signal", "rt-multi-thread", "net"] }
+tokio-stream = "0.1"
+futures = "0.3"
+
+# gRPC (must match opentelemetry-proto version)
+tonic = "0.14"
+tonic-build = "0.14"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP client for forwarding
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Arrow Flight IPC (OTAP)
+# Note: otel-arrow v0.45.0 uses workspace packages that cannot be directly used as git dependencies
+# (Cargo doesn't support git + path together, and workspace packages need the workspace context)
+# We're using arrow-flight directly, which is the underlying crate that otel-arrow uses.
+# If otel-arrow packages are published to crates.io in the future, we can switch to those.
+# For now, we implement Arrow Flight server using arrow-flight crate directly.
+
+# Python bindings
+pyo3 = { version = "0.20", features = ["auto-initialize", "extension-module"] }
+
+[lib]
+name = "otlp_arrow_library"
+path = "src/lib.rs"
+
+[[bin]]
+name = "otlp-arrow-service"
+path = "src/bin/main.rs"
+
+[dev-dependencies]
+tempfile = "3.8"
+wiremock = "0.6"
+filetime = "0.2"
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
