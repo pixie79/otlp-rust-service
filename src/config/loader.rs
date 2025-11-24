@@ -319,5 +319,69 @@ impl ConfigLoader {
                 config.forwarding = Some(forwarding);
             }
         }
+
+        // OTLP_DASHBOARD_ENABLED
+        if let Ok(enabled) = env::var("OTLP_DASHBOARD_ENABLED") {
+            match enabled.parse::<bool>() {
+                Ok(val) => {
+                    debug!(
+                        env_var = "OTLP_DASHBOARD_ENABLED",
+                        value = val,
+                        "Applying environment variable override"
+                    );
+                    config.dashboard.enabled = val;
+                }
+                Err(e) => {
+                    warn!(
+                        env_var = "OTLP_DASHBOARD_ENABLED",
+                        value = %enabled,
+                        error = %e,
+                        "Failed to parse environment variable, using default"
+                    );
+                }
+            }
+        }
+
+        // OTLP_DASHBOARD_PORT
+        if let Ok(port) = env::var("OTLP_DASHBOARD_PORT") {
+            match port.parse::<u16>() {
+                Ok(p) => {
+                    debug!(
+                        env_var = "OTLP_DASHBOARD_PORT",
+                        value = p,
+                        "Applying environment variable override"
+                    );
+                    config.dashboard.port = p;
+                }
+                Err(e) => {
+                    warn!(
+                        env_var = "OTLP_DASHBOARD_PORT",
+                        value = %port,
+                        error = %e,
+                        "Failed to parse environment variable, using default"
+                    );
+                }
+            }
+        }
+
+        // OTLP_DASHBOARD_STATIC_DIR
+        if let Ok(dir) = env::var("OTLP_DASHBOARD_STATIC_DIR") {
+            debug!(
+                env_var = "OTLP_DASHBOARD_STATIC_DIR",
+                value = %dir,
+                "Applying environment variable override"
+            );
+            config.dashboard.static_dir = PathBuf::from(dir);
+        }
+
+        // OTLP_DASHBOARD_BIND_ADDRESS
+        if let Ok(addr) = env::var("OTLP_DASHBOARD_BIND_ADDRESS") {
+            debug!(
+                env_var = "OTLP_DASHBOARD_BIND_ADDRESS",
+                value = %addr,
+                "Applying environment variable override"
+            );
+            config.dashboard.bind_address = addr;
+        }
     }
 }

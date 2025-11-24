@@ -23,6 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(), // Both Protobuf and Arrow Flight enabled
         forwarding: None,              // No forwarding by default
+        dashboard: Default::default(), // Dashboard disabled by default
     };
 
     // Create library instance (clone config since we need it later)

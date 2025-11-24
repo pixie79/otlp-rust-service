@@ -104,11 +104,132 @@ fn default_arrow_flight_port() -> u16 {
     4318
 }
 
+/// Configuration for dashboard HTTP server
+///
+/// Controls whether the Rust service serves the dashboard static files via HTTP.
+/// When enabled, the service starts an HTTP server on the specified port
+/// to serve static files from the configured directory.
+///
+/// # Default Values
+///
+/// - `enabled`: `false` (disabled by default)
+/// - `port`: `8080` (when enabled)
+/// - `static_dir`: `"./dashboard/dist"`
+///
+/// # Example
+///
+/// ```no_run
+/// use otlp_arrow_library::config::DashboardConfig;
+/// use std::path::PathBuf;
+///
+/// let dashboard = DashboardConfig {
+///     enabled: true,
+///     port: 8080,
+///     static_dir: PathBuf::from("./dashboard/dist"),
+///     bind_address: "127.0.0.1".to_string(), // or "0.0.0.0" for network access
+/// };
+/// ```
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DashboardConfig {
+    /// Whether dashboard HTTP server is enabled (default: false)
+    #[serde(default = "default_dashboard_enabled")]
+    pub enabled: bool,
+
+    /// Port for dashboard HTTP server (default: 8080)
+    #[serde(default = "default_dashboard_port")]
+    pub port: u16,
+
+    /// Directory containing dashboard static files (default: ./dashboard/dist)
+    #[serde(default = "default_dashboard_static_dir")]
+    pub static_dir: PathBuf,
+
+    /// Bind address for dashboard HTTP server (default: 127.0.0.1 for local-only access)
+    /// Use 0.0.0.0 to allow network access from other machines
+    #[serde(default = "default_dashboard_bind_address")]
+    pub bind_address: String,
+}
+
+impl Default for DashboardConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_dashboard_enabled(),
+            port: default_dashboard_port(),
+            static_dir: default_dashboard_static_dir(),
+            bind_address: default_dashboard_bind_address(),
+        }
+    }
+}
+
+impl DashboardConfig {
+    /// Validate dashboard configuration
+    pub fn validate(&self) -> Result<(), OtlpConfigError> {
+        if self.enabled {
+            // Validate port (u16 is already 0-65535, so just check for 0)
+            if self.port == 0 {
+                return Err(OtlpConfigError::ValidationFailed(
+                    "Dashboard port must be between 1 and 65535".to_string(),
+                ));
+            }
+
+            // Validate port doesn't conflict with gRPC ports
+            if self.port == 4317 || self.port == 4318 {
+                return Err(OtlpConfigError::ValidationFailed(
+                    "Dashboard port conflicts with gRPC port (4317 or 4318)".to_string(),
+                ));
+            }
+
+            // Validate bind address is a valid IP address format
+            if !self.bind_address.is_empty() {
+                // Basic validation: should be a valid IP address (127.0.0.1, 0.0.0.0, or IPv6)
+                if self.bind_address.parse::<std::net::IpAddr>().is_err() {
+                    return Err(OtlpConfigError::ValidationFailed(format!(
+                        "Dashboard bind_address must be a valid IP address: {}",
+                        self.bind_address
+                    )));
+                }
+            }
+
+            // Validate static directory exists when enabled
+            if !self.static_dir.exists() {
+                return Err(OtlpConfigError::InvalidOutputDir(format!(
+                    "Dashboard static directory does not exist: {}",
+                    self.static_dir.display()
+                )));
+            }
+
+            if !self.static_dir.is_dir() {
+                return Err(OtlpConfigError::InvalidOutputDir(format!(
+                    "Dashboard static directory is not a directory: {}",
+                    self.static_dir.display()
+                )));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn default_dashboard_enabled() -> bool {
+    false
+}
+
+fn default_dashboard_port() -> u16 {
+    8080
+}
+
+fn default_dashboard_static_dir() -> PathBuf {
+    PathBuf::from("./dashboard/dist")
+}
+
+fn default_dashboard_bind_address() -> String {
+    "127.0.0.1".to_string()
+}
+
 /// Main configuration structure for the OTLP Arrow Library
 ///
 /// This structure contains all configuration options for the library, including
-/// output directory, write intervals, cleanup schedules, protocol settings, and
-/// optional remote forwarding.
+/// output directory, write intervals, cleanup schedules, protocol settings,
+/// optional remote forwarding, and dashboard HTTP server.
 ///
 /// # Configuration Sources
 ///
@@ -125,6 +246,7 @@ fn default_arrow_flight_port() -> u16 {
 /// - `metric_cleanup_interval_secs`: `3600` (1 hour)
 /// - `protocols`: Both Protobuf and Arrow Flight enabled by default
 /// - `forwarding`: Disabled by default
+/// - `dashboard`: Disabled by default
 ///
 /// # Example
 ///
@@ -168,6 +290,10 @@ pub struct Config {
     /// Optional remote forwarding configuration
     #[serde(default)]
     pub forwarding: Option<ForwardingConfig>,
+
+    /// Dashboard HTTP server configuration
+    #[serde(default)]
+    pub dashboard: DashboardConfig,
 }
 
 impl Default for Config {
@@ -179,6 +305,7 @@ impl Default for Config {
             metric_cleanup_interval_secs: default_metric_cleanup_interval_secs(),
             protocols: ProtocolConfig::default(),
             forwarding: None,
+            dashboard: DashboardConfig::default(),
         }
     }
 }
@@ -269,6 +396,9 @@ impl Config {
         if let Some(ref forwarding) = self.forwarding {
             forwarding.validate()?;
         }
+
+        // Validate dashboard configuration
+        self.dashboard.validate()?;
 
         Ok(())
     }
@@ -504,6 +634,30 @@ impl ConfigBuilder {
     /// Set forwarding configuration (convenience method)
     pub fn forwarding(mut self, forwarding: Option<ForwardingConfig>) -> Self {
         self.config.forwarding = forwarding;
+        self
+    }
+
+    /// Set dashboard configuration
+    pub fn dashboard(mut self, dashboard: DashboardConfig) -> Self {
+        self.config.dashboard = dashboard;
+        self
+    }
+
+    /// Enable or disable dashboard
+    pub fn dashboard_enabled(mut self, enabled: bool) -> Self {
+        self.config.dashboard.enabled = enabled;
+        self
+    }
+
+    /// Set dashboard port
+    pub fn dashboard_port(mut self, port: u16) -> Self {
+        self.config.dashboard.port = port;
+        self
+    }
+
+    /// Set dashboard static directory
+    pub fn dashboard_static_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.config.dashboard.static_dir = dir.into();
         self
     }
 
