@@ -30,7 +30,15 @@ export class QueryExecutor {
   async execute(sql, params = []) {
     const start = now();
     try {
-      const rows = await this.client.query(sql, params);
+      const result = await this.client.query(sql, params);
+      let rows = [];
+      if (Array.isArray(result)) {
+        rows = result;
+      } else if (result?.toArray) {
+        rows = result.toArray();
+      } else if (result?.rows) {
+        rows = result.rows;
+      }
       return { rows, durationMs: now() - start };
     } catch (error) {
       throw new DuckDBError(sql, error);

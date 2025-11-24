@@ -55,6 +55,35 @@ body {
   justify-content: center;
 }
 
+.trace-panel {
+  grid-column: 1 / -1;
+}
+
+.trace-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.trace-panel__content {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 1rem;
+  min-height: 420px;
+}
+
+.trace-filter {
+  margin-bottom: 1rem;
+}
+
+.trace-filter .field-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
 .primary {
   background: linear-gradient(135deg, #22d3ee, #3b82f6);
   color: #0f172a;
@@ -70,6 +99,15 @@ body {
 .primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 20px rgba(34, 211, 238, 0.35);
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 0.6rem 1.2rem;
+  cursor: pointer;
 }
 
 .status-badge {
@@ -89,4 +127,68 @@ body {
   max-height: 280px;
   overflow: auto;
   margin: 0;
+}
+
+.trace-list {
+  position: relative;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  min-height: 360px;
+  overflow: hidden;
+}
+
+.trace-list__viewport {
+  position: relative;
+  overflow-y: auto;
+  height: 360px;
+}
+
+.trace-list__spacer {
+  position: relative;
+  width: 100%;
+}
+
+.trace-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.8fr 0.8fr 1fr;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  cursor: pointer;
+  background: rgba(15, 23, 42, 0.6);
+  align-items: center;
+}
+
+.trace-row.selected {
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.trace-row__column {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trace-row__column.status {
+  font-weight: 600;
+}
+
+.trace-row__column.status.error {
+  color: #f87171;
+}
+
+.trace-row__column.status.ok {
+  color: #4ade80;
+}
+
+.trace-detail {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.6);
+  min-height: 360px;
+  overflow: auto;
 }
