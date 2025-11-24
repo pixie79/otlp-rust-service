@@ -11,6 +11,10 @@
   margin-top: 1rem;
 }
 
+.panel.muted {
+  background: rgba(15, 23, 42, 0.65);
+}
+
 .loading {
   display: inline-flex;
   align-items: center;
@@ -33,4 +37,20 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.status-line {
+  min-width: 180px;
+  text-align: right;
+}
+
+.app-main h2 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.error-state {
+  max-width: 560px;
+  margin: 2rem auto;
+  text-align: center;
 }
