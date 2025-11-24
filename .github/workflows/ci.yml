@@ -23,11 +23,34 @@ jobs:
         with:
           components: rustfmt, clippy
       
-      - name: Check formatting
+      - name: Check Rust formatting
         run: cargo fmt --all -- --check
       
-      - name: Run clippy
+      - name: Run Rust clippy
         run: cargo clippy --all-targets --all-features -- -A non_local_definitions -D warnings
+      
+      - name: Setup Node.js
+        if: hashFiles('dashboard/package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+      
+      - name: Install JavaScript dependencies
+        if: hashFiles('dashboard/package.json') != ''
+        working-directory: dashboard
+        run: npm ci
+      
+      - name: Check all file formatting (JS, TS, CSS, JSON, YAML, MD, HTML)
+        if: hashFiles('dashboard/package.json') != ''
+        working-directory: dashboard
+        run: npm run format:check || (echo "Format check failed. Run 'npm run format' to fix." && exit 1)
+      
+      - name: Run JavaScript/TypeScript linting
+        if: hashFiles('dashboard/package.json') != ''
+        working-directory: dashboard
+        run: npm run lint || (echo "Linting failed. Fix errors and try again." && exit 1)
 
   # Unit and integration tests on Linux
   test-linux:

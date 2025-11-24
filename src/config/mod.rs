@@ -8,5 +8,6 @@ pub mod types;
 
 pub use loader::ConfigLoader;
 pub use types::{
-    AuthConfig, Config, ConfigBuilder, ForwardingConfig, ForwardingProtocol, ProtocolConfig,
+    AuthConfig, Config, ConfigBuilder, DashboardConfig, ForwardingConfig, ForwardingProtocol,
+    ProtocolConfig,
 };

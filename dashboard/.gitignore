@@ -1,0 +1,26 @@
+# Node / general build artifacts
+node_modules/
+dist/
+build/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+
+# Environment files
+.env
+.env.*
+
+# Testing artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sw?

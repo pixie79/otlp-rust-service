@@ -38,6 +38,7 @@ Verify compliance with OTLP Rust Service Constitution principles:
 - **User Experience Consistency (III)**: Are API contracts, error formats, and configuration patterns consistent?
 - **Performance Requirements (IV)**: Are SLOs defined? Are performance targets measurable and achievable?
 - **Observability & Reliability (V)**: Are logging, metrics, tracing, and health checks planned?
+- **Commit Workflow**: Before committing, ensure CHANGELOG.md is updated, all docs are current, `cargo clippy` and `cargo fmt` pass, all tests pass, and commits are GPG signed.
 
 Any violations or exceptions MUST be documented in the Complexity Tracking section below.
 
