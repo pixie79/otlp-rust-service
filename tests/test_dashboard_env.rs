@@ -10,6 +10,7 @@ fn clear_dashboard_env_vars() {
     env::remove_var("OTLP_DASHBOARD_ENABLED");
     env::remove_var("OTLP_DASHBOARD_PORT");
     env::remove_var("OTLP_DASHBOARD_STATIC_DIR");
+    env::remove_var("OTLP_DASHBOARD_BIND_ADDRESS");
 }
 
 #[test]
@@ -45,6 +46,7 @@ fn test_dashboard_config_from_env_enabled() {
     assert!(config.dashboard.enabled);
     assert_eq!(config.dashboard.port, 9000);
     assert_eq!(config.dashboard.static_dir, static_dir);
+    assert_eq!(config.dashboard.bind_address, "127.0.0.1"); // Default
 
     clear_dashboard_env_vars();
 }
@@ -63,6 +65,7 @@ fn test_dashboard_config_from_env_defaults() {
         config.dashboard.static_dir,
         PathBuf::from("./dashboard/dist")
     );
+    assert_eq!(config.dashboard.bind_address, "127.0.0.1"); // Default
 }
 
 #[test]
@@ -82,6 +85,7 @@ fn test_dashboard_config_from_env_partial() {
     assert!(config.dashboard.enabled);
     assert_eq!(config.dashboard.port, 8080); // Default port
     assert_eq!(config.dashboard.static_dir, static_dir);
+    assert_eq!(config.dashboard.bind_address, "127.0.0.1"); // Default
 
     clear_dashboard_env_vars();
 }
@@ -115,6 +119,7 @@ dashboard:
     assert!(config.dashboard.enabled); // Overridden by env
     assert_eq!(config.dashboard.port, 9000); // Overridden by env
     assert_eq!(config.dashboard.static_dir, static_dir); // Overridden by env
+    assert_eq!(config.dashboard.bind_address, "127.0.0.1"); // Default (not overridden)
 
     clear_dashboard_env_vars();
 }
