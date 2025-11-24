@@ -3,11 +3,13 @@
 //! Runs as a standalone service that receives OTLP messages via gRPC
 //! (both Protobuf and Arrow Flight) and writes them to Arrow IPC files.
 
+use otlp_arrow_library::config::ConfigLoader;
+use otlp_arrow_library::dashboard::server::DashboardServer;
 use otlp_arrow_library::otlp::{OtlpArrowFlightServer, OtlpGrpcServer};
 use otlp_arrow_library::{Config, OtlpLibrary};
 use std::net::SocketAddr;
 use tokio::io::AsyncWriteExt;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,8 +19,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .json()
         .init();
 
-    // Load configuration (for now, use defaults)
-    let config = Config::default();
+    // Load configuration from environment variables (with defaults)
+    let config = ConfigLoader::from_env().unwrap_or_else(|e| {
+        warn!(error = %e, "Failed to load configuration from environment, using defaults");
+        Config::default()
+    });
 
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await?;
@@ -89,11 +94,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     info!("Listening for OTLP messages...");
 
-    // Start health check endpoint (simple HTTP server on port 8080)
+    // Start dashboard HTTP server if enabled
+    let dashboard_handle = if config.dashboard.enabled {
+        let dashboard_server =
+            DashboardServer::new(config.dashboard.static_dir.clone(), config.dashboard.port);
+
+        match dashboard_server.start().await {
+            Ok(handle) => {
+                info!(
+                    port = config.dashboard.port,
+                    static_dir = %config.dashboard.static_dir.display(),
+                    "Dashboard HTTP server started"
+                );
+                Some(handle)
+            }
+            Err(e) => {
+                error!(
+                    error = %e,
+                    "Failed to start dashboard HTTP server, continuing without dashboard"
+                );
+                None
+            }
+        }
+    } else {
+        info!("Dashboard disabled (default)");
+        None
+    };
+
+    // Start health check endpoint (simple HTTP server on port 8081 to avoid conflict with dashboard)
+    let health_port = if config.dashboard.enabled && config.dashboard.port == 8080 {
+        8081
+    } else {
+        8080
+    };
+
     let health_handle = tokio::spawn(async move {
-        use std::net::SocketAddr;
-        let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
-        let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+        let addr: SocketAddr = format!("0.0.0.0:{}", health_port).parse().unwrap();
+        let listener = match tokio::net::TcpListener::bind(&addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                error!(error = %e, "Failed to bind health check endpoint");
+                return;
+            }
+        };
         info!("Health check endpoint listening on {}", addr);
 
         loop {
@@ -121,6 +164,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(handle) = arrow_flight_handle {
         handle.abort();
+    }
+    if let Some(handle) = dashboard_handle {
+        handle.abort();
+        info!("Dashboard HTTP server stopped");
     }
     health_handle.abort();
 

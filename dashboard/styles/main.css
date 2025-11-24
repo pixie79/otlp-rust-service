@@ -48,6 +48,32 @@ body {
   padding: 1.5rem;
 }
 
+/* Responsive layout for tablet and desktop */
+@media (min-width: 768px) {
+  .app-main {
+    grid-template-columns: 1fr;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .trace-panel__content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-main {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .trace-panel,
+  .metric-panel {
+    grid-column: 1 / -1;
+  }
+}
+
 .intro-panel {
   display: flex;
   flex-direction: column;

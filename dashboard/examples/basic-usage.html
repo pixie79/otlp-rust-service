@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OTLP Dashboard - Basic Usage Example</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    .example {
+      background: #f5f5f5;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+    code {
+      background: #e0e0e0;
+      padding: 0.2rem 0.4rem;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>OTLP Realtime Dashboard - Basic Usage Examples</h1>
+
+  <div class="example">
+    <h2>1. Standalone Usage (File System Access API)</h2>
+    <p>Open the dashboard HTML file directly in a browser that supports File System Access API:</p>
+    <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;script type="module" src="src/main.js"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div id="app"&gt;&lt;/div&gt;
+  &lt;script type="module"&gt;
+    import { App } from './src/app.js';
+    const app = new App(document.getElementById('app'));
+    app.initialize();
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+  </div>
+
+  <div class="example">
+    <h2>2. Served by Rust Service</h2>
+    <p>When the Rust service has <code>dashboard.enabled: true</code>, access the dashboard at:</p>
+    <pre><code>http://localhost:8080</code></pre>
+    <p>The dashboard will still use File System Access API to read Arrow IPC files directly from the output directory.</p>
+  </div>
+
+  <div class="example">
+    <h2>3. Programmatic Usage</h2>
+    <pre><code>import { App } from './src/app.js';
+
+const app = new App(document.getElementById('app'));
+
+// Initialize the application
+await app.initialize();
+
+// The app will prompt for directory selection
+// Or you can programmatically set the directory if you have a handle</code></pre>
+  </div>
+
+  <div class="example">
+    <h2>4. Keyboard Shortcuts</h2>
+    <ul>
+      <li><code>Ctrl+1</code> or <code>Cmd+1</code>: Switch to Traces view</li>
+      <li><code>Ctrl+2</code> or <code>Cmd+2</code>: Switch to Metrics view</li>
+      <li><code>/</code>: Focus search bar</li>
+      <li><code>Escape</code>: Clear search</li>
+      <li><code>Ctrl+P</code> or <code>Cmd+P</code>: Pause/Resume live stream</li>
+    </ul>
+  </div>
+
+  <div class="example">
+    <h2>5. Configuration</h2>
+    <p>Access settings via the Settings button (⚙️) in the header to configure:</p>
+    <ul>
+      <li>Polling interval (how often to check for new files)</li>
+      <li>Max traces (maximum number of traces to keep in memory)</li>
+      <li>Max graph points (maximum data points per metric graph)</li>
+      <li>Max loaded tables (maximum DuckDB tables in memory)</li>
+    </ul>
+  </div>
+</body>
+</html>
+

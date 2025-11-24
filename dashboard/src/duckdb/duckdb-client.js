@@ -7,11 +7,14 @@ const sanitizeTableName = (fileName) =>
   'arrow_table';
 
 export class DuckDBClient {
-  constructor() {
+  constructor(options = {}) {
     this.db = null;
     this.connection = null;
     this.worker = null;
     this.initialized = false;
+    this.registeredTables = new Map(); // Track registered tables with metadata
+    this.maxTables = options.maxTables || 100; // Maximum number of tables to keep in memory
+    this.tableAccessOrder = []; // Track table access order for LRU eviction
   }
 
   async initialize() {
@@ -33,19 +36,81 @@ export class DuckDBClient {
     }
   }
 
+  /**
+   * Register Arrow IPC file with optimization for large files
+   * Implements memory management by unregistering old tables when limit is reached
+   */
   async registerArrowFile(fileName, arrowBuffer) {
     this._ensureReady();
     try {
       const tableName = sanitizeTableName(fileName);
+      
+      // Check if we need to evict old tables
+      if (this.registeredTables.size >= this.maxTables && !this.registeredTables.has(tableName)) {
+        await this._evictOldestTable();
+      }
+
+      // Parse Arrow table (this is necessary for DuckDB)
+      // For very large files, this might take time, but Arrow IPC format requires full parsing
       const table = tableFromIPC(arrowBuffer);
+      
+      // Register table in DuckDB
       await this.connection.insertArrowTable(table, {
         name: tableName,
         createTable: true,
         replace: true,
       });
+
+      // Track registered table
+      this.registeredTables.set(tableName, {
+        fileName,
+        registeredAt: Date.now(),
+        lastAccessed: Date.now(),
+        rowCount: table.numRows || 0,
+      });
+
+      // Update access order
+      this._updateAccessOrder(tableName);
+
       return tableName;
     } catch (error) {
       throw new DuckDBError(`registerArrowFile:${fileName}`, error);
+    }
+  }
+
+  /**
+   * Evict oldest table (LRU eviction)
+   * @private
+   */
+  async _evictOldestTable() {
+    if (this.tableAccessOrder.length === 0) {
+      return;
+    }
+
+    // Remove oldest accessed table
+    const oldestTable = this.tableAccessOrder.shift();
+    if (oldestTable && this.registeredTables.has(oldestTable)) {
+      await this.unregisterTable(oldestTable);
+    }
+  }
+
+  /**
+   * Update access order for LRU tracking
+   * @private
+   */
+  _updateAccessOrder(tableName) {
+    // Remove from current position if exists
+    const index = this.tableAccessOrder.indexOf(tableName);
+    if (index > -1) {
+      this.tableAccessOrder.splice(index, 1);
+    }
+    // Add to end (most recently used)
+    this.tableAccessOrder.push(tableName);
+
+    // Update last accessed time
+    const tableInfo = this.registeredTables.get(tableName);
+    if (tableInfo) {
+      tableInfo.lastAccessed = Date.now();
     }
   }
 
@@ -53,7 +118,21 @@ export class DuckDBClient {
     this._ensureReady();
     try {
       const result = await this.connection.query(sql, params);
-      return result?.toArray?.() ?? [];
+      const rows = result?.toArray?.() ?? [];
+      
+      // Update access order for tables referenced in query
+      // Extract table names from SQL (simple heuristic)
+      const tableMatches = sql.match(/FROM\s+(\w+)/gi);
+      if (tableMatches) {
+        for (const match of tableMatches) {
+          const tableName = match.replace(/FROM\s+/i, '').trim();
+          if (this.registeredTables.has(tableName)) {
+            this._updateAccessOrder(tableName);
+          }
+        }
+      }
+
+      return rows;
     } catch (error) {
       throw new DuckDBError(sql, error);
     }
@@ -64,9 +143,50 @@ export class DuckDBClient {
     try {
       const safeName = sanitizeTableName(tableName);
       await this.connection.run(`DROP TABLE IF EXISTS ${safeName};`);
+      
+      // Remove from tracking
+      this.registeredTables.delete(safeName);
+      const index = this.tableAccessOrder.indexOf(safeName);
+      if (index > -1) {
+        this.tableAccessOrder.splice(index, 1);
+      }
     } catch (error) {
       throw new DuckDBError(`unregisterTable:${tableName}`, error);
     }
+  }
+
+  /**
+   * Get statistics about registered tables
+   */
+  getTableStats() {
+    return {
+      count: this.registeredTables.size,
+      maxTables: this.maxTables,
+      tables: Array.from(this.registeredTables.entries()).map(([name, info]) => ({
+        name,
+        ...info,
+      })),
+    };
+  }
+
+  /**
+   * Unregister tables older than specified age (in milliseconds)
+   */
+  async unregisterOldTables(maxAgeMs) {
+    const now = Date.now();
+    const tablesToRemove = [];
+
+    for (const [tableName, info] of this.registeredTables.entries()) {
+      if (now - info.registeredAt > maxAgeMs) {
+        tablesToRemove.push(tableName);
+      }
+    }
+
+    for (const tableName of tablesToRemove) {
+      await this.unregisterTable(tableName);
+    }
+
+    return tablesToRemove.length;
   }
 
   async close() {

@@ -1,12 +1,15 @@
 <!--
 Sync Impact Report:
-Version change: 1.0.0 → 1.0.1
-Modified principles:
-  - II. Testing Standards: Updated minimum code coverage from 80% to 85% per file
+Version change: 1.0.1 → 1.1.0
+Modified principles: None
+Added sections:
+  - Development Workflow & Quality Gates: Added "Commit Workflow" subsection with CHANGELOG.md requirements, documentation updates, and GPG signing mandate
 Modified sections:
-  - Development Workflow & Quality Gates: Updated coverage threshold from 80% to 85% per file
+  - Development Workflow & Quality Gates: Enhanced Pre-Commit Checks to reference commit workflow requirements
 Templates requiring updates:
   ✅ constitution.md (this file)
+  ✅ plan-template.md (updated Constitution Check section to reference commit workflow)
+  ⚠️ spec-template.md (optional: may add note about commit workflow in development process if applicable)
 Follow-up TODOs: None
 -->
 
@@ -56,6 +59,23 @@ All services MUST emit structured logs with appropriate log levels (ERROR, WARN,
 
 ## Development Workflow & Quality Gates
 
+### Commit Workflow (NON-NEGOTIABLE)
+
+Before creating any commit, the following MUST be completed in order:
+
+1. **Documentation Updates**: CHANGELOG.md MUST be updated with all changes for the commit. All relevant documentation (README.md, API docs, user guides) MUST be updated to reflect code changes. Documentation MUST be accurate and current before commit.
+
+2. **Code Quality Checks**: The following commands MUST pass without errors or warnings:
+   - `cargo fmt` MUST be run to format code (or `cargo fmt --check` must pass)
+   - `cargo clippy -- -D warnings` MUST pass with no warnings
+   - `cargo test` MUST pass (all unit, integration, and documentation tests)
+
+3. **GPG Signing**: All commits MUST be GPG signed. Commits without valid GPG signatures are prohibited and MUST be rejected.
+
+4. **Pre-Push Validation**: Before pushing commits, all quality gates MUST pass. No commit may be pushed if any of the above requirements are not met.
+
+This workflow ensures code quality, documentation accuracy, and commit authenticity. Violations of this workflow MUST be corrected before merge or push.
+
 ### Pre-Commit Checks
 
 - `cargo fmt --check` MUST pass (code formatting)
@@ -63,6 +83,8 @@ All services MUST emit structured logs with appropriate log levels (ERROR, WARN,
 - `cargo test` MUST pass (all tests)
 - `cargo test --doc` MUST pass (documentation tests)
 - Code coverage MUST not decrease below 85% threshold per file
+- CHANGELOG.md MUST be current (see Commit Workflow)
+- All documentation MUST be updated (see Commit Workflow)
 
 ### CI/CD Pipeline Gates
 
@@ -95,4 +117,4 @@ This constitution supersedes all other development practices and standards. All 
 
 All PRs and code reviews MUST verify compliance with the constitution. Violations MUST be addressed before merge. Complexity that violates principles MUST be justified with documented rationale and approved exceptions.
 
-**Version**: 1.0.1 | **Ratified**: 2024-11-23 | **Last Amended**: 2024-11-23
+**Version**: 1.1.0 | **Ratified**: 2024-11-23 | **Last Amended**: 2024-12-19

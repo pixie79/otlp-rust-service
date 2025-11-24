@@ -60,6 +60,7 @@ async fn test_arrow_ipc_conversion_traces() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     // Create exporter
@@ -127,6 +128,7 @@ async fn test_arrow_ipc_conversion_empty_traces() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let exporter = OtlpFileExporter::new(&config).unwrap();

@@ -1,6 +1,10 @@
 import { DuckDBClient } from '../duckdb/duckdb-client.js';
+import { configManager } from '../config.js';
 
-const duckdbClient = new DuckDBClient();
+// Initialize DuckDB client with memory management
+const duckdbClient = new DuckDBClient({
+  maxTables: configManager.get('maxLoadedFiles'),
+});
 
 const handlers = {
   async INIT() {

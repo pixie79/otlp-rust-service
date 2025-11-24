@@ -17,6 +17,10 @@ const defaultFilters = () => ({
   maxDuration: null,
 });
 
+/**
+ * TraceList component for displaying and managing trace entries
+ * Implements virtual scrolling for performance with large datasets
+ */
 export class TraceList {
   constructor(container, options = {}) {
     if (!container) {
@@ -178,5 +182,26 @@ export class TraceList {
     });
 
     return row;
+  }
+
+  /**
+   * Get the current number of traces
+   * @returns {number} Number of traces
+   */
+  getTraceCount() {
+    return this.traces.length;
+  }
+
+  /**
+   * Remove the oldest traces
+   * @param {number} count - Number of traces to remove
+   */
+  removeOldestTraces(count) {
+    if (count <= 0 || count > this.traces.length) return;
+    
+    // Remove oldest traces (they are sorted by start time descending)
+    this.traces = this.traces.slice(0, this.traces.length - count);
+    this._applyFilters();
+    this._renderWindow(true);
   }
 }

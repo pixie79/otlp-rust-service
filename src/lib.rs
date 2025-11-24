@@ -32,6 +32,7 @@
 
 pub mod api;
 pub mod config;
+pub mod dashboard;
 pub mod error;
 pub mod mock;
 pub mod otlp;
@@ -40,7 +41,9 @@ pub mod python;
 
 // Re-export public API
 pub use api::public::OtlpLibrary;
-pub use config::{AuthConfig, Config, ConfigBuilder, ForwardingConfig, ForwardingProtocol};
+pub use config::{
+    AuthConfig, Config, ConfigBuilder, DashboardConfig, ForwardingConfig, ForwardingProtocol,
+};
 pub use error::{OtlpConfigError, OtlpError, OtlpExportError, OtlpServerError};
 pub use mock::service::MockOtlpService;
 
