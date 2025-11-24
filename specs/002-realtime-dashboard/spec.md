@@ -106,6 +106,7 @@ The dashboard must provide an intuitive, responsive web interface that allows us
 - Q: How should the dashboard handle file watching - polling or file system events? → A: Polling with configurable interval (default 1 second) for browser compatibility, with option for File System Access API events if available
 - Q: Should the Rust service have a configuration option for web dashboard integration? → A: Yes, the Rust service MUST have a configuration setting (dashboard.enabled) in YAML config to enable/disable serving the dashboard via HTTP. Default value MUST be false (disabled). When enabled, the Rust service serves the dashboard files as static content via HTTP server.
 - Q: When the Rust service serves the dashboard, how should the dashboard access Arrow IPC files? → A: Dashboard uses direct file system access (File System Access API or FileReader API) - same as standalone mode. Rust service only serves static dashboard files, not Arrow IPC data. Dashboard reads Arrow IPC files directly from the output directory via browser file APIs.
+- Q: How should AI testing tools be integrated into the dashboard testing strategy? → A: AI tools are optional and can supplement traditional testing (Jest/Vitest, Playwright) for visual regression testing, accessibility validation (WCAG 2.1 AA), and code quality analysis. AI tools complement but do not replace core automated tests.
 
 ## Requirements *(mandatory)*
 
@@ -136,6 +137,7 @@ The dashboard must provide an intuitive, responsive web interface that allows us
 - **FR-023**: When dashboard.enabled is true, Rust service MUST serve dashboard static files via HTTP server on a configurable port (default 8080)
 - **FR-024**: Rust service dashboard configuration MUST support environment variable override (OTLP_DASHBOARD_ENABLED, OTLP_DASHBOARD_PORT)
 - **FR-025**: When served by Rust service, dashboard MUST still use direct file system access (File System Access API or FileReader API) to read Arrow IPC files - Rust service only serves static dashboard files, not Arrow IPC data
+- **FR-026**: Dashboard testing MUST include unit tests (Jest/Vitest), integration tests, and E2E tests (Playwright). AI testing tools MAY be used optionally to supplement traditional testing for visual regression, accessibility validation (WCAG 2.1 AA), and code quality analysis
 
 ### Key Entities *(include if feature involves data)*
 
