@@ -25,17 +25,17 @@
 
 **Purpose**: Dashboard project initialization and basic structure
 
-- [ ] T001 Create dashboard directory structure per implementation plan: dashboard/src/, dashboard/tests/, dashboard/styles/
-- [ ] T002 Initialize npm project with package.json in dashboard/ directory
-- [ ] T003 [P] Add dependencies to dashboard/package.json: @duckdb/duckdb-wasm, apache-arrow, plotly.js-dist-min, vite
-- [ ] T004 [P] Add dev dependencies to dashboard/package.json: vitest, @vitest/ui, playwright, @playwright/test
-- [ ] T005 [P] Configure vite.config.js in dashboard/ with ES module support and build settings
-- [ ] T006 [P] Create dashboard/index.html with main entry point and basic structure
-- [ ] T007 [P] Create dashboard/.gitignore with Node.js patterns (node_modules/, dist/, etc.)
-- [ ] T008 [P] Create dashboard/README.md with project overview and setup instructions
-- [ ] T009 [P] Setup test directory structure: dashboard/tests/unit/, dashboard/tests/integration/, dashboard/tests/e2e/
-- [ ] T010 [P] Configure vitest.config.js in dashboard/ for unit and integration tests
-- [ ] T011 [P] Configure playwright.config.js in dashboard/ for E2E tests
+- [x] T001 Create dashboard directory structure per implementation plan: dashboard/src/, dashboard/tests/, dashboard/styles/
+- [x] T002 Initialize npm project with package.json in dashboard/ directory
+- [x] T003 [P] Add dependencies to dashboard/package.json: @duckdb/duckdb-wasm, apache-arrow, plotly.js-dist-min, vite
+- [x] T004 [P] Add dev dependencies to dashboard/package.json: vitest, @vitest/ui, playwright, @playwright/test
+- [x] T005 [P] Configure vite.config.js in dashboard/ with ES module support and build settings
+- [x] T006 [P] Create dashboard/index.html with main entry point and basic structure
+- [x] T007 [P] Create dashboard/.gitignore with Node.js patterns (node_modules/, dist/, etc.)
+- [x] T008 [P] Create dashboard/README.md with project overview and setup instructions
+- [x] T009 [P] Setup test directory structure: dashboard/tests/unit/, dashboard/tests/integration/, dashboard/tests/e2e/
+- [x] T010 [P] Configure vitest.config.js in dashboard/ for unit and integration tests
+- [x] T011 [P] Configure playwright.config.js in dashboard/ for E2E tests
 
 ---
 
