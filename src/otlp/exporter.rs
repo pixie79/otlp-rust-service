@@ -863,3 +863,112 @@ impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for FileMetricExpo
         opentelemetry_sdk::metrics::Temporality::Cumulative
     }
 }
+
+/// OtlpLibrary-based MetricExporter implementation
+///
+/// This exporter wraps an `OtlpLibrary` instance and implements `PushMetricExporter`
+/// for seamless integration with OpenTelemetry SDK's `PeriodicReader`.
+#[derive(Clone, Debug)]
+pub struct OtlpMetricExporter {
+    library: Arc<crate::api::public::OtlpLibrary>,
+}
+
+impl OtlpMetricExporter {
+    /// Create a new OtlpMetricExporter with the given library instance
+    pub(crate) fn new(library: Arc<crate::api::public::OtlpLibrary>) -> Self {
+        Self { library }
+    }
+}
+
+impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for OtlpMetricExporter {
+    fn export(
+        &self,
+        metrics: &ResourceMetrics,
+    ) -> impl std::future::Future<Output = opentelemetry_sdk::error::OTelSdkResult> + Send {
+        let library = self.library.clone();
+
+        async move {
+            match library.export_metrics_ref(metrics).await {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    warn!("Failed to export metrics via OtlpLibrary: {}", e);
+                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                        format!("OtlpLibrary export failed: {}", e),
+                    ))
+                }
+            }
+        }
+    }
+
+    fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
+        // Try to get current runtime handle
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            // If we're in an async context, spawn the flush task
+            // Note: This is best-effort - the flush will happen asynchronously
+            let library = self.library.clone();
+            handle.spawn(async move {
+                let _ = library.flush().await;
+            });
+            Ok(())
+        } else {
+            // No runtime available, can't flush
+            Ok(())
+        }
+    }
+
+    fn shutdown_with_timeout(
+        &self,
+        _timeout: std::time::Duration,
+    ) -> opentelemetry_sdk::error::OTelSdkResult {
+        // Shutdown is handled by OtlpLibrary::shutdown() separately
+        Ok(())
+    }
+
+    fn temporality(&self) -> opentelemetry_sdk::metrics::Temporality {
+        opentelemetry_sdk::metrics::Temporality::Cumulative
+    }
+}
+
+/// OtlpLibrary-based SpanExporter implementation
+///
+/// This exporter wraps an `OtlpLibrary` instance and implements `SpanExporter`
+/// for seamless integration with OpenTelemetry SDK's `TracerProvider`.
+#[derive(Clone, Debug)]
+pub struct OtlpSpanExporter {
+    library: Arc<crate::api::public::OtlpLibrary>,
+}
+
+impl OtlpSpanExporter {
+    /// Create a new OtlpSpanExporter with the given library instance
+    pub(crate) fn new(library: Arc<crate::api::public::OtlpLibrary>) -> Self {
+        Self { library }
+    }
+}
+
+impl SpanExporter for OtlpSpanExporter {
+    #[allow(refining_impl_trait_reachable)]
+    fn export(
+        &self,
+        batch: Vec<SpanData>,
+    ) -> BoxFuture<'static, opentelemetry_sdk::error::OTelSdkResult> {
+        let library = self.library.clone();
+
+        async move {
+            match library.export_traces(batch).await {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    warn!("Failed to export traces via OtlpLibrary: {}", e);
+                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                        format!("OtlpLibrary export failed: {}", e),
+                    ))
+                }
+            }
+        }
+        .boxed()
+    }
+
+    fn shutdown(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {
+        // Shutdown is handled by OtlpLibrary::shutdown() separately
+        Ok(())
+    }
+}

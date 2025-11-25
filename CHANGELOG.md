@@ -41,6 +41,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dashboard.bind_address`: Bind address for dashboard HTTP server (default: "127.0.0.1" for local-only access, use "0.0.0.0" for network access)
 - Environment variable overrides: `OTLP_DASHBOARD_ENABLED`, `OTLP_DASHBOARD_PORT`, `OTLP_DASHBOARD_STATIC_DIR`, `OTLP_DASHBOARD_BIND_ADDRESS`
 
+## [0.2.0] - 2024-11-25
+
+### Added
+- **Built-in OpenTelemetry SDK Exporter Implementations**: Added `OtlpMetricExporter` and `OtlpSpanExporter` types that implement OpenTelemetry SDK's `PushMetricExporter` and `SpanExporter` traits, enabling direct integration with OpenTelemetry SDK without custom wrapper code
+  - `OtlpLibrary::metric_exporter()` - Returns a `PushMetricExporter` implementation for use with `PeriodicReader` or `ManualReader`
+  - `OtlpLibrary::span_exporter()` - Returns a `SpanExporter` implementation for use with `TracerProvider`
+  - Both exporters delegate to the underlying `OtlpLibrary` instance and handle error conversion automatically
+- **Reference-Based Metric Export**: Added `export_metrics_ref(&ResourceMetrics)` method to `OtlpLibrary` for efficient metric export without requiring ownership
+  - Accepts `&ResourceMetrics` instead of owned `ResourceMetrics`, avoiding unnecessary data copying
+  - Functionally equivalent to `export_metrics()` but more efficient for integration with OpenTelemetry SDK's periodic readers
+  - Available in both Rust and Python APIs
+- **Python Exporter Bindings**: Added Python bindings for exporter creation methods
+  - `PyOtlpLibrary.metric_exporter()` - Returns `PyOtlpMetricExporter` instance
+  - `PyOtlpLibrary.span_exporter()` - Returns `PyOtlpSpanExporter` instance
+  - Foundation for future Python OpenTelemetry SDK integration (tracked in Issue #6)
+
 ## [0.1.0] - 2024-11-23
 
 ### Added
