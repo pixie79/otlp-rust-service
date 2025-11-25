@@ -519,7 +519,7 @@ impl PyOtlpSpanExporter {
 
 /// Python module definition
 #[pymodule]
-fn otlp_arrow_library(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn otlp_arrow_library(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOtlpLibrary>()?;
     m.add_class::<PyOtlpMetricExporter>()?;
     m.add_class::<PyOtlpSpanExporter>()?;
