@@ -95,8 +95,11 @@ jobs:
         run: |
           source .venv/bin/activate
           python3 -m pip install pytest
-          if [ -f "tests/python/test_*.py" ]; then
+          # Run Python tests - fail if any test files exist but tests fail
+          if [ -n "$(find tests/python -name 'test_*.py' -type f 2>/dev/null)" ]; then
             python3 -m pytest tests/python/ -v
+          else
+            echo "No Python test files found, skipping Python tests"
           fi
 
   # Unit and integration tests on macOS
@@ -152,8 +155,11 @@ jobs:
         run: |
           source .venv/bin/activate
           python3 -m pip install pytest
-          if [ -f "tests/python/test_*.py" ]; then
+          # Run Python tests - fail if any test files exist but tests fail
+          if [ -n "$(find tests/python -name 'test_*.py' -type f 2>/dev/null)" ]; then
             python3 -m pytest tests/python/ -v
+          else
+            echo "No Python test files found, skipping Python tests"
           fi
 
   # Unit and integration tests on Windows
