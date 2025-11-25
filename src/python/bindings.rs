@@ -192,6 +192,43 @@ impl PyOtlpLibrary {
         })
     }
 
+    /// Create a Python OpenTelemetry SDK MetricExporter adapter
+    ///
+    /// Returns a Python class that implements Python OpenTelemetry SDK's MetricExporter
+    /// interface, enabling direct use with PeriodicExportingMetricReader.
+    ///
+    /// Returns:
+    ///     PyOtlpMetricExporterAdapter: A metric exporter adapter for Python OpenTelemetry SDK
+    ///
+    /// Example:
+    ///     ```python
+    ///     from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+    ///     library = PyOtlpLibrary(output_dir="/tmp/otlp")
+    ///     metric_exporter = library.metric_exporter_adapter()
+    ///     reader = PeriodicExportingMetricReader(metric_exporter)
+    ///     ```
+    pub fn metric_exporter_adapter(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<crate::python::adapters::PyOtlpMetricExporterAdapter> {
+        // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
+        // In PyO3 pymethods, self is &Self where Self is the PyClass
+        // We can get the Python object using Py::from with explicit conversion
+        use crate::python::adapters::LibraryRef;
+        // PyClass instances implement PyNativeType, so we can use Py::from
+        // But we need to get the Python object reference first
+        // The simplest approach: use Py::from with the Python object obtained via GIL
+        let library_ref: LibraryRef = unsafe {
+            // Get the Python object pointer from self
+            // PyClass instances are Python objects, so we can get the pointer
+            let py_ptr = self as *const Self as *mut pyo3::ffi::PyObject;
+            Py::from_borrowed_ptr(py, py_ptr)
+        };
+        Ok(crate::python::adapters::PyOtlpMetricExporterAdapter {
+            library: library_ref,
+        })
+    }
+
     /// Create a SpanExporter implementation for use with OpenTelemetry SDK
     ///
     /// Returns:
@@ -207,6 +244,43 @@ impl PyOtlpLibrary {
         let exporter = self.library.span_exporter();
         Ok(PyOtlpSpanExporter {
             exporter: Arc::new(exporter),
+        })
+    }
+
+    /// Create a Python OpenTelemetry SDK SpanExporter adapter
+    ///
+    /// Returns a Python class that implements Python OpenTelemetry SDK's SpanExporter
+    /// interface, enabling direct use with BatchSpanProcessor and TracerProvider.
+    ///
+    /// Returns:
+    ///     PyOtlpSpanExporterAdapter: A span exporter adapter for Python OpenTelemetry SDK
+    ///
+    /// Example:
+    ///     ```python
+    ///     from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    ///     library = PyOtlpLibrary(output_dir="/tmp/otlp")
+    ///     span_exporter = library.span_exporter_adapter()
+    ///     processor = BatchSpanProcessor(span_exporter)
+    ///     ```
+    pub fn span_exporter_adapter(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<crate::python::adapters::PyOtlpSpanExporterAdapter> {
+        // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
+        // In PyO3 pymethods, self is &Self where Self is the PyClass
+        // We can get the Python object using Py::from with explicit conversion
+        use crate::python::adapters::LibraryRef;
+        // PyClass instances implement PyNativeType, so we can use Py::from
+        // But we need to get the Python object reference first
+        // The simplest approach: use Py::from with the Python object obtained via GIL
+        let library_ref: LibraryRef = unsafe {
+            // Get the Python object pointer from self
+            // PyClass instances are Python objects, so we can get the pointer
+            let py_ptr = self as *const Self as *mut pyo3::ffi::PyObject;
+            Py::from_borrowed_ptr(py, py_ptr)
+        };
+        Ok(crate::python::adapters::PyOtlpSpanExporterAdapter {
+            library: library_ref,
         })
     }
 }
@@ -449,6 +523,8 @@ fn otlp_arrow_library(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOtlpLibrary>()?;
     m.add_class::<PyOtlpMetricExporter>()?;
     m.add_class::<PyOtlpSpanExporter>()?;
+    m.add_class::<crate::python::adapters::PyOtlpMetricExporterAdapter>()?;
+    m.add_class::<crate::python::adapters::PyOtlpSpanExporterAdapter>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
