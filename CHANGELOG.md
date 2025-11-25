@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - 2024-11-25
+## [0.3.0] - 2025-01-27
 
 ### Added
 - **Built-in OpenTelemetry SDK Exporter Implementations**: Added `OtlpMetricExporter` and `OtlpSpanExporter` types that implement OpenTelemetry SDK's `PushMetricExporter` and `SpanExporter` traits, enabling direct integration with OpenTelemetry SDK without custom wrapper code

@@ -10,6 +10,11 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+# Default permissions for all jobs (can be overridden per job)
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   # Linting and formatting check
   lint:
@@ -367,10 +372,14 @@ jobs:
   #   needs: [lint, test-linux, test-macos, test-windows, build, python-build, coverage]
   #   # Note: All checks including coverage must pass before publishing
   #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  #   permissions:
+  #     contents: write  # Required to create and push git tags
+  #     pull-requests: read
   #   steps:
   #     - uses: actions/checkout@v4
   #       with:
   #         fetch-depth: 0  # Required for git tag operations
+  #         token: ${{ secrets.GITHUB_TOKEN }}  # Required for pushing tags
   #     
   #     - name: Install Rust
   #       uses: dtolnay/rust-toolchain@stable
@@ -413,8 +422,7 @@ jobs:
   #         git config user.email "github-actions[bot]@users.noreply.github.com"
   #         git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
   #         git push origin "v${{ steps.version.outputs.version }}"
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       # Note: GITHUB_TOKEN is automatically available when permissions are set above
   #     
   #     - name: Verify package is ready for publishing
   #       run: |

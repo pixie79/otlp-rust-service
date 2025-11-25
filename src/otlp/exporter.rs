@@ -777,15 +777,10 @@ impl SpanExporter for FileSpanExporter {
 
         async move {
             // Export traces asynchronously
-            match file_exporter.export_traces(batch).await {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    warn!("Failed to export traces to file: {}", e);
-                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                        e.to_string(),
-                    ))
-                }
-            }
+            file_exporter.export_traces(batch).await.map_err(|e| {
+                warn!("Failed to export traces to file: {}", e);
+                opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string())
+            })
         }
         .boxed()
     }
@@ -828,15 +823,10 @@ impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for FileMetricExpo
 
         async move {
             // Convert and write metrics
-            match file_exporter.export_metrics(metrics).await {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    warn!("Failed to export metrics to file: {}", e);
-                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                        e.to_string(),
-                    ))
-                }
-            }
+            file_exporter.export_metrics(metrics).await.map_err(|e| {
+                warn!("Failed to export metrics to file: {}", e);
+                opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string())
+            })
         }
     }
 
@@ -888,23 +878,23 @@ impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for OtlpMetricExpo
         let library = self.library.clone();
 
         async move {
-            match library.export_metrics_ref(metrics).await {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    warn!("Failed to export metrics via OtlpLibrary: {}", e);
-                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                        format!("OtlpLibrary export failed: {}", e),
-                    ))
-                }
-            }
+            library.export_metrics_ref(metrics).await.map_err(|e| {
+                warn!("Failed to export metrics via OtlpLibrary: {}", e);
+                opentelemetry_sdk::error::OTelSdkError::InternalFailure(format!(
+                    "OtlpLibrary export failed: {}",
+                    e
+                ))
+            })
         }
     }
 
     fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
-        // Try to get current runtime handle
+        // Note: This is a best-effort async flush that doesn't block.
+        // The flush happens asynchronously in the background.
+        // For guaranteed flush completion, call OtlpLibrary::flush() directly.
+        // This implementation spawns a task to avoid blocking the current runtime,
+        // which is necessary when called from OpenTelemetry SDK's synchronous context.
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            // If we're in an async context, spawn the flush task
-            // Note: This is best-effort - the flush will happen asynchronously
             let library = self.library.clone();
             handle.spawn(async move {
                 let _ = library.flush().await;
@@ -954,15 +944,13 @@ impl SpanExporter for OtlpSpanExporter {
         let library = self.library.clone();
 
         async move {
-            match library.export_traces(batch).await {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    warn!("Failed to export traces via OtlpLibrary: {}", e);
-                    Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                        format!("OtlpLibrary export failed: {}", e),
-                    ))
-                }
-            }
+            library.export_traces(batch).await.map_err(|e| {
+                warn!("Failed to export traces via OtlpLibrary: {}", e);
+                opentelemetry_sdk::error::OTelSdkError::InternalFailure(format!(
+                    "OtlpLibrary export failed: {}",
+                    e
+                ))
+            })
         }
         .boxed()
     }
