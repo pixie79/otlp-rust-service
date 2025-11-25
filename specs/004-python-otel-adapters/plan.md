@@ -1,7 +1,7 @@
 # Implementation Plan: Python OpenTelemetry SDK Adapter Classes
 
-**Branch**: `001-python-otel-adapters` | **Date**: 2025-11-25 | **Spec**: [spec.md](spec.md)
-**Input**: Feature specification from `/specs/001-python-otel-adapters/spec.md`
+**Branch**: `004-python-otel-adapters` | **Date**: 2025-11-25 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `/specs/004-python-otel-adapters/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
@@ -55,7 +55,7 @@ Any violations or exceptions MUST be documented in the Complexity Tracking secti
 ### Documentation (this feature)
 
 ```text
-specs/001-python-otel-adapters/
+specs/004-python-otel-adapters/
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)

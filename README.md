@@ -336,7 +336,7 @@ metric_reader = PeriodicExportingMetricReader(metric_exporter)
 span_processor = BatchSpanProcessor(span_exporter)
 ```
 
-See [Python OpenTelemetry SDK Adapter Quickstart](specs/001-python-otel-adapters/quickstart.md) for complete examples.
+See [Python OpenTelemetry SDK Adapter Quickstart](specs/004-python-otel-adapters/quickstart.md) for complete examples.
 
 ## Examples
 

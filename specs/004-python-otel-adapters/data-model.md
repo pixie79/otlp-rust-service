@@ -1,6 +1,6 @@
 # Data Model: Python OpenTelemetry SDK Adapter Classes
 
-**Feature**: 001-python-otel-adapters  
+**Feature**: 004-python-otel-adapters  
 **Date**: 2025-11-25
 
 ## Overview

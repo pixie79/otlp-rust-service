@@ -1,6 +1,6 @@
 # Feature Specification: Python OpenTelemetry SDK Adapter Classes
 
-**Feature Branch**: `001-python-otel-adapters`  
+**Feature Branch**: `004-python-otel-adapters`  
 **Created**: 2025-11-25  
 **Status**: Draft  
 **Input**: User description: "Review the following issue and its commnets - [Issue #6](https://github.com/pixie79/otlp-rust-service/issues/6)"

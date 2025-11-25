@@ -1,7 +1,7 @@
 # Python API Contract: Python OpenTelemetry SDK Adapter Classes
 
 **Date**: 2025-11-25  
-**Feature**: 001-python-otel-adapters
+**Feature**: 004-python-otel-adapters
 
 ## Overview
 

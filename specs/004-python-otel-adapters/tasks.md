@@ -1,6 +1,6 @@
 # Tasks: Python OpenTelemetry SDK Adapter Classes
 
-**Input**: Design documents from `/specs/001-python-otel-adapters/`
+**Input**: Design documents from `/specs/004-python-otel-adapters/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
 **Tests**: TDD approach - tests written first, then implementation. All tests must be written and fail before implementation begins.
@@ -152,7 +152,7 @@
 - [ ] T056 [P] Add edge case tests for error scenarios in tests/python/test_adapters_metrics.py and test_adapters_spans.py
 - [ ] T057 [P] Add edge case tests for lifecycle scenarios (library shutdown, adapter after shutdown) in tests/python/test_integration_otel_sdk.py
 - [ ] T058 [P] Verify all tests pass (cargo test --all-features --workspace and pytest tests/python/)
-- [ ] T059 [P] Update API documentation in specs/001-python-otel-adapters/contracts/python-api.md if needed
+- [ ] T059 [P] Update API documentation in specs/004-python-otel-adapters/contracts/python-api.md if needed
 - [ ] T060 [P] Final code review and refactoring if needed
 
 ---
