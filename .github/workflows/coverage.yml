@@ -16,6 +16,7 @@ jobs:
   coverage:
     name: Code Coverage Validation (85% per file)
     runs-on: ubuntu-latest
+    needs: []  # Can run independently, but can also depend on test-linux if desired
     
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +30,19 @@ jobs:
           sudo apt-get install -y bc
           cargo install cargo-tarpaulin
       
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Run tests with coverage
         run: |
           cargo tarpaulin \

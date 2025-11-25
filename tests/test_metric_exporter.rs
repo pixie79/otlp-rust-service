@@ -140,14 +140,14 @@ async fn test_otlp_metric_exporter_error_conversion() {
 
     // Shutdown library to cause export to fail
     library.shutdown().await.expect("Shutdown should succeed");
-    
+
     // Wait a bit for shutdown to complete
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-    
+
     // Try to export after shutdown - should convert error appropriately
     let metrics = create_test_metric();
     let result = exporter.export(&metrics).await;
-    
+
     // Should return OTelSdkError::InternalFailure
     // Note: After shutdown, the library may still accept exports if the batch buffer
     // is still active, so we check for either error or success (both are valid)

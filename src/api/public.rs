@@ -427,11 +427,11 @@ impl OtlpLibrary {
     ///
     /// ```no_run
     /// use otlp_arrow_library::OtlpLibrary;
-    /// use opentelemetry_sdk::trace::TracerProvider;
+    /// use opentelemetry_sdk::trace::SdkTracerProvider;
     ///
     /// # async fn example(library: OtlpLibrary) -> Result<(), Box<dyn std::error::Error>> {
     /// let span_exporter = library.span_exporter();
-    /// let provider = TracerProvider::builder()
+    /// let provider = SdkTracerProvider::builder()
     ///     .with_batch_exporter(span_exporter, opentelemetry_sdk::runtime::Tokio)
     ///     .build();
     /// # Ok(())
