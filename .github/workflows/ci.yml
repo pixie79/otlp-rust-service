@@ -81,7 +81,9 @@ jobs:
             ${{ runner.os }}-cargo-
       
       - name: Run tests
-        run: cargo test --all-features --workspace
+        # Don't use --all-features to avoid enabling python-extension feature
+        # which requires Python linking. Python bindings are tested separately.
+        run: cargo test --workspace
       
       - name: Build Python bindings
         run: |
@@ -145,7 +147,9 @@ jobs:
             ${{ runner.os }}-cargo-
       
       - name: Run tests
-        run: cargo test --all-features --workspace
+        # Don't use --all-features to avoid enabling python-extension feature
+        # which requires Python linking. Python bindings are tested separately.
+        run: cargo test --workspace
       
       - name: Build Python bindings
         run: |
@@ -194,7 +198,9 @@ jobs:
             ${{ runner.os }}-cargo-
       
       - name: Run tests
-        run: cargo test --all-features --workspace
+        # Exclude python-extension feature to avoid Python linking during Rust tests
+        # Python bindings are tested separately
+        run: cargo test --workspace
         shell: cmd
 
   # Code coverage validation - runs after tests pass and reuses test build cache
