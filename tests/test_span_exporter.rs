@@ -3,8 +3,7 @@
 use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId};
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::{SpanData, SpanExporter};
-use opentelemetry_sdk::Resource;
-use otlp_arrow_library::{Config, OtlpLibrary, OtlpSpanExporter};
+use otlp_arrow_library::{Config, OtlpLibrary};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use tempfile::TempDir;

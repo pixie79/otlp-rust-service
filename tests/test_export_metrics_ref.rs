@@ -1,8 +1,6 @@
 //! Unit tests for export_metrics_ref method
 
-use opentelemetry::KeyValue;
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
-use opentelemetry_sdk::Resource;
 use otlp_arrow_library::{Config, OtlpLibrary};
 use std::path::PathBuf;
 use tempfile::TempDir;
