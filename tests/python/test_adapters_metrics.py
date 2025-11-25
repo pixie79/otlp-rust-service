@@ -29,8 +29,8 @@ def test_metric_exporter_interface():
         result = metric_exporter.shutdown()
         assert result is None, "shutdown() should return None"
         
-        # Test force_flush (pass timeout as positional argument)
-        flush_result = metric_exporter.force_flush(1000)
+        # Test force_flush (pass timeout as keyword argument)
+        flush_result = metric_exporter.force_flush(timeout_millis=1000)
         assert flush_result is not None, "force_flush() should return a result"
         
         # Test temporality

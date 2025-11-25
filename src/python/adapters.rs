@@ -142,7 +142,8 @@ impl PyOtlpMetricExporterAdapter {
     /// # Returns
     ///
     /// ExportResult (SUCCESS or FAILURE)
-    pub fn force_flush(&self, _timeout_millis: Option<u64>, py: Python<'_>) -> PyResult<PyObject> {
+    #[pyo3(signature = (*, timeout_millis=None))]
+    pub fn force_flush(&self, timeout_millis: Option<u64>, py: Python<'_>) -> PyResult<PyObject> {
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
             return Err(error_message_to_py(
