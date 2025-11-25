@@ -4,10 +4,11 @@
 //! exporter interfaces, enabling seamless integration between Python OpenTelemetry SDK
 //! and OtlpLibrary without requiring custom adapter code.
 
+#![allow(non_local_definitions)] // pyo3 pymethods macro generates non-local impl blocks
+
 pub mod conversion;
 
 use crate::python::bindings::PyOtlpLibrary;
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 
 /// Python garbage collection handling utilities
@@ -81,7 +82,13 @@ impl PyOtlpMetricExporterAdapter {
     ///
     /// ExportResult (SUCCESS or FAILURE)
     #[pyo3(signature = (metrics_data, *, timeout_millis=None))]
-    pub fn export(&self, metrics_data: &PyAny, timeout_millis: Option<u64>, py: Python<'_>) -> PyResult<PyObject> {
+    #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
+    pub fn export(
+        &self,
+        metrics_data: &PyAny,
+        timeout_millis: Option<u64>,
+        py: Python<'_>,
+    ) -> PyResult<PyObject> {
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
             return Err(error_message_to_py(
@@ -144,6 +151,7 @@ impl PyOtlpMetricExporterAdapter {
     ///
     /// ExportResult (SUCCESS or FAILURE)
     #[pyo3(signature = (*, timeout_millis=None))]
+    #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
     pub fn force_flush(&self, timeout_millis: Option<u64>, py: Python<'_>) -> PyResult<PyObject> {
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
@@ -159,7 +167,7 @@ impl PyOtlpMetricExporterAdapter {
         let library = library_ref.library.clone();
         let runtime = library_ref.runtime.clone();
         drop(library_ref); // Explicitly drop PyRef before async operation
-        
+
         // Call flush using the extracted runtime
         runtime
             .block_on(async move { library.flush().await })
@@ -204,7 +212,7 @@ impl PyOtlpMetricExporterAdapter {
     fn __repr__(&self) -> String {
         "PyOtlpMetricExporterAdapter".to_string()
     }
-    
+
     /// Get _preferred_temporality attribute (required by OpenTelemetry SDK)
     ///
     /// This is accessed as an attribute by PeriodicExportingMetricReader
@@ -214,7 +222,7 @@ impl PyOtlpMetricExporterAdapter {
                 // Return a dict mapping metric types to AggregationTemporality.CUMULATIVE
                 // The SDK expects: {Counter: CUMULATIVE, Histogram: CUMULATIVE, ...}
                 let temporality_dict = pyo3::types::PyDict::new(py);
-                
+
                 // Safely import and get AggregationTemporality.CUMULATIVE
                 let cumulative = match py
                     .import("opentelemetry.sdk.metrics.export")
@@ -227,19 +235,25 @@ impl PyOtlpMetricExporterAdapter {
                         return Ok(temporality_dict.into());
                     }
                 };
-                
+
                 // Get metric types from opentelemetry.sdk.metrics
                 if let Ok(metrics_module) = py.import("opentelemetry.sdk.metrics") {
-                    let metric_types = ["Counter", "Histogram", "UpDownCounter", 
-                                        "ObservableCounter", "ObservableGauge", "ObservableUpDownCounter"];
-                    
+                    let metric_types = [
+                        "Counter",
+                        "Histogram",
+                        "UpDownCounter",
+                        "ObservableCounter",
+                        "ObservableGauge",
+                        "ObservableUpDownCounter",
+                    ];
+
                     for metric_type_name in metric_types {
                         if let Ok(metric_type) = metrics_module.getattr(metric_type_name) {
                             let _ = temporality_dict.set_item(metric_type, cumulative);
                         }
                     }
                 }
-                
+
                 Ok(temporality_dict.into())
             }
             "_preferred_aggregation" => {
@@ -249,9 +263,10 @@ impl PyOtlpMetricExporterAdapter {
             }
             _ => {
                 // Return AttributeError for unknown attributes (Python convention)
-                Err(pyo3::exceptions::PyAttributeError::new_err(
-                    format!("'PyOtlpMetricExporterAdapter' object has no attribute '{}'", name)
-                ))
+                Err(pyo3::exceptions::PyAttributeError::new_err(format!(
+                    "'PyOtlpMetricExporterAdapter' object has no attribute '{}'",
+                    name
+                )))
             }
         }
     }
@@ -344,7 +359,7 @@ impl PyOtlpSpanExporterAdapter {
         let library = library_ref.library.clone();
         let runtime = library_ref.runtime.clone();
         drop(library_ref); // Explicitly drop PyRef before async operation
-        
+
         // Call flush using the extracted runtime
         runtime
             .block_on(async move { library.flush().await })

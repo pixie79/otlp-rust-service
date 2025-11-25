@@ -148,13 +148,12 @@ pub fn convert_metric_export_result_to_dict<'py>(
     // MetricExportResult typically has a resource_metrics attribute
     // Use get_item first to check if it's a dict, then fall back to getattr
     let resource_metrics = if let Ok(dict) = metrics_data.downcast::<PyDict>() {
-        dict.get_item("resource_metrics")?
-            .ok_or_else(|| {
-                conversion_error_to_py(
-                    "resource_metrics not found in MetricExportResult dict".to_string(),
-                    None,
-                )
-            })?
+        dict.get_item("resource_metrics")?.ok_or_else(|| {
+            conversion_error_to_py(
+                "resource_metrics not found in MetricExportResult dict".to_string(),
+                None,
+            )
+        })?
     } else {
         metrics_data.getattr("resource_metrics").map_err(|e| {
             conversion_error_to_py(
@@ -169,13 +168,12 @@ pub fn convert_metric_export_result_to_dict<'py>(
 
     // Extract resource attributes
     let resource = if let Ok(dict) = resource_metrics.downcast::<PyDict>() {
-        dict.get_item("resource")?
-            .ok_or_else(|| {
-                conversion_error_to_py(
-                    "resource not found in ResourceMetrics dict".to_string(),
-                    None,
-                )
-            })?
+        dict.get_item("resource")?.ok_or_else(|| {
+            conversion_error_to_py(
+                "resource not found in ResourceMetrics dict".to_string(),
+                None,
+            )
+        })?
     } else {
         resource_metrics.getattr("resource").map_err(|e| {
             conversion_error_to_py(
@@ -192,7 +190,7 @@ pub fn convert_metric_export_result_to_dict<'py>(
     } else {
         resource.getattr("attributes").ok()
     };
-    
+
     if let Some(attributes) = attributes {
         if let Ok(attrs_dict) = attributes.downcast::<PyDict>() {
             for (key, value) in attrs_dict.iter() {
@@ -207,13 +205,12 @@ pub fn convert_metric_export_result_to_dict<'py>(
 
     // Extract scope_metrics
     let scope_metrics = if let Ok(dict) = resource_metrics.downcast::<PyDict>() {
-        dict.get_item("scope_metrics")?
-            .ok_or_else(|| {
-                conversion_error_to_py(
-                    "scope_metrics not found in ResourceMetrics dict".to_string(),
-                    None,
-                )
-            })?
+        dict.get_item("scope_metrics")?.ok_or_else(|| {
+            conversion_error_to_py(
+                "scope_metrics not found in ResourceMetrics dict".to_string(),
+                None,
+            )
+        })?
     } else {
         resource_metrics.getattr("scope_metrics").map_err(|e| {
             conversion_error_to_py(
@@ -231,48 +228,42 @@ pub fn convert_metric_export_result_to_dict<'py>(
             if scope_metric.is_none() {
                 continue;
             }
-            
+
             let scope_metric_dict = PyDict::new(py);
 
             // Extract scope information - handle both dict and attribute access
             // Wrap in error handling to prevent segfaults from invalid Python objects
-            let scope = (|| -> Option<&'py PyAny> {
-                if let Ok(dict) = scope_metric.downcast::<PyDict>() {
-                    dict.get_item("scope").ok().flatten()
-                } else {
-                    // Use getattr with error handling - catch any Python exceptions
-                    scope_metric.getattr("scope").ok()
-                }
-            })();
-            
+            let scope = if let Ok(dict) = scope_metric.downcast::<PyDict>() {
+                dict.get_item("scope").ok().flatten()
+            } else {
+                // Use getattr with error handling - catch any Python exceptions
+                scope_metric.getattr("scope").ok()
+            };
+
             if let Some(scope) = scope {
                 // Skip if scope is None
                 if scope.is_none() {
                     continue;
                 }
-                
+
                 let scope_dict = PyDict::new(py);
                 // Safely extract name and version with error handling
-                let name = (|| -> Option<&'py PyAny> {
-                    if let Ok(d) = scope.downcast::<PyDict>() {
-                        d.get_item("name").ok().flatten()
-                    } else {
-                        scope.getattr("name").ok()
-                    }
-                })();
+                let name = if let Ok(d) = scope.downcast::<PyDict>() {
+                    d.get_item("name").ok().flatten()
+                } else {
+                    scope.getattr("name").ok()
+                };
                 if let Some(name) = name {
                     if !name.is_none() {
                         let _ = scope_dict.set_item("name", name);
                     }
                 }
-                
-                let version = (|| -> Option<&'py PyAny> {
-                    if let Ok(d) = scope.downcast::<PyDict>() {
-                        d.get_item("version").ok().flatten()
-                    } else {
-                        scope.getattr("version").ok()
-                    }
-                })();
+
+                let version = if let Ok(d) = scope.downcast::<PyDict>() {
+                    d.get_item("version").ok().flatten()
+                } else {
+                    scope.getattr("version").ok()
+                };
                 if let Some(version) = version {
                     if !version.is_none() {
                         let _ = scope_dict.set_item("version", version);
@@ -282,19 +273,17 @@ pub fn convert_metric_export_result_to_dict<'py>(
             }
 
             // Extract metrics - handle both dict and attribute access
-            let metrics = (|| -> Option<&'py PyAny> {
-                if let Ok(dict) = scope_metric.downcast::<PyDict>() {
-                    dict.get_item("metrics").ok().flatten()
-                } else {
-                    scope_metric.getattr("metrics").ok()
-                }
-            })();
-            
+            let metrics = if let Ok(dict) = scope_metric.downcast::<PyDict>() {
+                dict.get_item("metrics").ok().flatten()
+            } else {
+                scope_metric.getattr("metrics").ok()
+            };
+
             if let Some(metrics) = metrics {
                 if metrics.is_none() {
                     continue;
                 }
-                
+
                 let metrics_list = PyList::empty(py);
                 if let Ok(metrics_py_list) = metrics.downcast::<PyList>() {
                     for metric in metrics_py_list.iter() {
@@ -302,62 +291,54 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         if metric.is_none() {
                             continue;
                         }
-                        
+
                         let metric_dict = PyDict::new(py);
-                        
+
                         // Safely extract metric fields with error handling
-                        let name = (|| -> Option<&'py PyAny> {
-                            if let Ok(d) = metric.downcast::<PyDict>() {
-                                d.get_item("name").ok().flatten()
-                            } else {
-                                metric.getattr("name").ok()
-                            }
-                        })();
+                        let name = if let Ok(d) = metric.downcast::<PyDict>() {
+                            d.get_item("name").ok().flatten()
+                        } else {
+                            metric.getattr("name").ok()
+                        };
                         if let Some(name) = name {
                             if !name.is_none() {
                                 let _ = metric_dict.set_item("name", name);
                             }
                         }
-                        
-                        let description = (|| -> Option<&'py PyAny> {
-                            if let Ok(d) = metric.downcast::<PyDict>() {
-                                d.get_item("description").ok().flatten()
-                            } else {
-                                metric.getattr("description").ok()
-                            }
-                        })();
+
+                        let description = if let Ok(d) = metric.downcast::<PyDict>() {
+                            d.get_item("description").ok().flatten()
+                        } else {
+                            metric.getattr("description").ok()
+                        };
                         if let Some(description) = description {
                             if !description.is_none() {
                                 let _ = metric_dict.set_item("description", description);
                             }
                         }
-                        
-                        let unit = (|| -> Option<&'py PyAny> {
-                            if let Ok(d) = metric.downcast::<PyDict>() {
-                                d.get_item("unit").ok().flatten()
-                            } else {
-                                metric.getattr("unit").ok()
-                            }
-                        })();
+
+                        let unit = if let Ok(d) = metric.downcast::<PyDict>() {
+                            d.get_item("unit").ok().flatten()
+                        } else {
+                            metric.getattr("unit").ok()
+                        };
                         if let Some(unit) = unit {
                             if !unit.is_none() {
                                 let _ = metric_dict.set_item("unit", unit);
                             }
                         }
-                        
-                        let data = (|| -> Option<&'py PyAny> {
-                            if let Ok(d) = metric.downcast::<PyDict>() {
-                                d.get_item("data").ok().flatten()
-                            } else {
-                                metric.getattr("data").ok()
-                            }
-                        })();
+
+                        let data = if let Ok(d) = metric.downcast::<PyDict>() {
+                            d.get_item("data").ok().flatten()
+                        } else {
+                            metric.getattr("data").ok()
+                        };
                         if let Some(data) = data {
                             if !data.is_none() {
                                 let _ = metric_dict.set_item("data", data);
                             }
                         }
-                        
+
                         let _ = metrics_list.append(metric_dict);
                     }
                 }
