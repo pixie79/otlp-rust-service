@@ -160,18 +160,30 @@ impl PyOtlpLibrary {
 
     /// Force immediate flush of all buffered messages to disk
     pub fn flush(&self) -> PyResult<()> {
-        let library = self.library.clone();
-        self.runtime
-            .block_on(async move { library.flush().await })
-            .map_err(|e| PyRuntimeError::new_err(format!("Flush error: {}", e)))
+        Python::with_gil(|py| {
+            let library = self.library.clone();
+            let runtime = self.runtime.clone();
+            // Release GIL before blocking on async operation to prevent deadlocks and segfaults
+            py.allow_threads(|| {
+                runtime
+                    .block_on(async move { library.flush().await })
+                    .map_err(|e| PyRuntimeError::new_err(format!("Flush error: {}", e)))
+            })
+        })
     }
 
     /// Gracefully shut down the library, flushing all pending writes
     pub fn shutdown(&self) -> PyResult<()> {
         let library = self.library.clone();
-        self.runtime
-            .block_on(async move { library.shutdown().await })
-            .map_err(|e| PyRuntimeError::new_err(format!("Shutdown error: {}", e)))
+        let runtime = self.runtime.clone();
+        // Release GIL before blocking on async operation to prevent deadlocks and segfaults
+        Python::with_gil(|py| {
+            py.allow_threads(|| {
+                runtime
+                    .block_on(async move { library.shutdown().await })
+                    .map_err(|e| PyRuntimeError::new_err(format!("Shutdown error: {}", e)))
+            })
+        })
     }
 
     /// Create a PushMetricExporter implementation for use with OpenTelemetry SDK

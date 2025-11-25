@@ -55,7 +55,7 @@ pub use gc::{is_library_valid, LibraryRef};
 use crate::python::adapters::conversion::{
     convert_metric_export_result_to_dict, convert_span_sequence_to_dict_list, error_message_to_py,
 };
-use pyo3::types::{PyAny, PyString};
+use pyo3::types::PyString;
 
 /// Python metric exporter adapter that implements Python OpenTelemetry SDK's MetricExporter interface
 ///
@@ -170,10 +170,12 @@ impl PyOtlpMetricExporterAdapter {
         let runtime = library_ref.runtime.clone();
         drop(library_ref); // Explicitly drop PyRef before async operation
 
-        // Call flush using the extracted runtime
-        runtime
-            .block_on(async move { library.flush().await })
-            .map_err(|e| error_message_to_py(format!("Failed to flush metrics: {}", e)))?;
+        // Release GIL before blocking on async operation to prevent deadlocks and segfaults
+        py.allow_threads(|| {
+            runtime
+                .block_on(async move { library.flush().await })
+                .map_err(|e| error_message_to_py(format!("Failed to flush metrics: {}", e)))
+        })?;
 
         // Return ExportResult.SUCCESS
         let export_result = py
@@ -364,10 +366,12 @@ impl PyOtlpSpanExporterAdapter {
         let runtime = library_ref.runtime.clone();
         drop(library_ref); // Explicitly drop PyRef before async operation
 
-        // Call flush using the extracted runtime
-        runtime
-            .block_on(async move { library.flush().await })
-            .map_err(|e| error_message_to_py(format!("Failed to flush spans: {}", e)))?;
+        // Release GIL before blocking on async operation to prevent deadlocks and segfaults
+        py.allow_threads(|| {
+            runtime
+                .block_on(async move { library.flush().await })
+                .map_err(|e| error_message_to_py(format!("Failed to flush spans: {}", e)))
+        })?;
 
         // Return SpanExportResult.SUCCESS
         let span_export_result = py
