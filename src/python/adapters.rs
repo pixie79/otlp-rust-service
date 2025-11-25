@@ -153,13 +153,14 @@ impl PyOtlpMetricExporterAdapter {
         }
 
         // Delegate to library.flush()
-        // Extract the library and runtime from the borrowed reference
+        // Extract library and runtime, then drop PyRef before calling block_on
+        // This avoids potential lifetime issues with PyRef during async operations
         let library_ref = self.library.borrow(py);
         let library = library_ref.library.clone();
         let runtime = library_ref.runtime.clone();
-        drop(library_ref); // Release PyRef
+        drop(library_ref); // Explicitly drop PyRef before async operation
         
-        // Call flush directly without releasing GIL (same pattern as other methods)
+        // Call flush using the extracted runtime
         runtime
             .block_on(async move { library.flush().await })
             .map_err(|e| error_message_to_py(format!("Failed to flush metrics: {}", e)))?;
@@ -337,13 +338,14 @@ impl PyOtlpSpanExporterAdapter {
         }
 
         // Delegate to library.flush()
-        // Extract the library and runtime from the borrowed reference
+        // Extract library and runtime, then drop PyRef before calling block_on
+        // This avoids potential lifetime issues with PyRef during async operations
         let library_ref = self.library.borrow(py);
         let library = library_ref.library.clone();
         let runtime = library_ref.runtime.clone();
-        drop(library_ref); // Release PyRef
+        drop(library_ref); // Explicitly drop PyRef before async operation
         
-        // Call flush directly without releasing GIL (same pattern as other methods)
+        // Call flush using the extracted runtime
         runtime
             .block_on(async move { library.flush().await })
             .map_err(|e| error_message_to_py(format!("Failed to flush spans: {}", e)))?;
