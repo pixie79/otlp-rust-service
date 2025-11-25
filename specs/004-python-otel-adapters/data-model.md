@@ -23,7 +23,7 @@ This feature extends the existing Python bindings with adapter classes that impl
 - Delegates to `PyOtlpLibrary::export_metrics()` or `export_metrics_ref()` methods
 
 **State Transitions**:
-- **Created**: Adapter created via `PyOtlpLibrary::metric_exporter()` method
+- **Created**: Adapter created via `PyOtlpLibrary::metric_exporter_adapter()` method
 - **Active**: Adapter used by Python OpenTelemetry SDK to export metrics
 - **Shutdown**: Python OpenTelemetry SDK calls `shutdown()` (no-op, library shutdown is separate)
 - **Invalid**: Library instance has been shut down (export operations will fail)
@@ -34,7 +34,7 @@ This feature extends the existing Python bindings with adapter classes that impl
 - Type conversion must preserve 100% of metric data without loss or corruption
 
 **Lifecycle**:
-- Created: When `PyOtlpLibrary::metric_exporter()` is called
+- Created: When `PyOtlpLibrary::metric_exporter_adapter()` is called
 - Used: When Python OpenTelemetry SDK calls `export()` method
 - Shutdown: When Python OpenTelemetry SDK calls `shutdown()` (no-op, library shutdown is separate)
 - Garbage Collected: When no Python references remain (library reference prevents premature GC)
@@ -61,7 +61,7 @@ This feature extends the existing Python bindings with adapter classes that impl
 - Delegates to `PyOtlpLibrary::export_traces()` method
 
 **State Transitions**:
-- **Created**: Adapter created via `PyOtlpLibrary::span_exporter()` method
+- **Created**: Adapter created via `PyOtlpLibrary::span_exporter_adapter()` method
 - **Active**: Adapter used by Python OpenTelemetry SDK to export spans
 - **Shutdown**: Python OpenTelemetry SDK calls `shutdown()` (no-op, library shutdown is separate)
 - **Invalid**: Library instance has been shut down (export operations will fail)
@@ -72,7 +72,7 @@ This feature extends the existing Python bindings with adapter classes that impl
 - Type conversion must preserve 100% of span data without loss or corruption
 
 **Lifecycle**:
-- Created: When `PyOtlpLibrary::span_exporter()` is called
+- Created: When `PyOtlpLibrary::span_exporter_adapter()` is called
 - Used: When Python OpenTelemetry SDK calls `export()` method
 - Shutdown: When Python OpenTelemetry SDK calls `shutdown()` (no-op, library shutdown is separate)
 - Garbage Collected: When no Python references remain (library reference prevents premature GC)
@@ -177,12 +177,12 @@ This feature extends the existing Python bindings with adapter classes that impl
 
 ```
 PyOtlpLibrary
-    ├── metric_exporter() → PyOtlpMetricExporterAdapter
+    ├── metric_exporter_adapter() → PyOtlpMetricExporterAdapter
     │                           ├── wraps: PyOtlpLibrary
     │                           ├── implements: Python OpenTelemetry SDK MetricExporter
     │                           └── uses: Type Conversion Layer
     │
-    └── span_exporter() → PyOtlpSpanExporterAdapter
+    └── span_exporter_adapter() → PyOtlpSpanExporterAdapter
                             ├── wraps: PyOtlpLibrary
                             ├── implements: Python OpenTelemetry SDK SpanExporter
                             └── uses: Type Conversion Layer

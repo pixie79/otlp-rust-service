@@ -11,7 +11,7 @@ This contract defines the Python API for adapter classes that implement Python O
 
 ### PyOtlpLibrary Extensions
 
-#### `PyOtlpLibrary.metric_exporter() -> PyOtlpMetricExporterAdapter`
+#### `PyOtlpLibrary.metric_exporter_adapter() -> PyOtlpMetricExporterAdapter`
 
 Creates a Python metric exporter adapter that implements Python OpenTelemetry SDK's `MetricExporter` interface.
 
@@ -26,7 +26,7 @@ import otlp_arrow_library
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
 library = otlp_arrow_library.PyOtlpLibrary(output_dir="/tmp/otlp")
-metric_exporter = library.metric_exporter()
+metric_exporter = library.metric_exporter_adapter()
 
 # Use directly with Python OpenTelemetry SDK
 reader = PeriodicExportingMetricReader(metric_exporter, export_interval_millis=5000)
@@ -38,7 +38,7 @@ reader = PeriodicExportingMetricReader(metric_exporter, export_interval_millis=5
 
 ---
 
-#### `PyOtlpLibrary.span_exporter() -> PyOtlpSpanExporterAdapter`
+#### `PyOtlpLibrary.span_exporter_adapter() -> PyOtlpSpanExporterAdapter`
 
 Creates a Python span exporter adapter that implements Python OpenTelemetry SDK's `SpanExporter` interface.
 
@@ -53,7 +53,7 @@ import otlp_arrow_library
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 library = otlp_arrow_library.PyOtlpLibrary(output_dir="/tmp/otlp")
-span_exporter = library.span_exporter()
+span_exporter = library.span_exporter_adapter()
 
 # Use directly with Python OpenTelemetry SDK
 processor = BatchSpanProcessor(span_exporter)
@@ -223,7 +223,7 @@ Forces immediate flush of all pending exports.
 
 ### Adapter Creation
 
-- Adapters are created via `library.metric_exporter()` or `library.span_exporter()`
+- Adapters are created via `library.metric_exporter_adapter()` or `library.span_exporter_adapter()`
 - Adapters hold a reference to the library to prevent garbage collection
 - Adapters remain valid while library instance is valid
 

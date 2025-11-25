@@ -208,21 +208,20 @@ impl PyOtlpLibrary {
     ///     reader = PeriodicExportingMetricReader(metric_exporter)
     ///     ```
     pub fn metric_exporter_adapter(
-        &self,
+        slf: PyRef<'_, Self>,
         py: Python<'_>,
     ) -> PyResult<crate::python::adapters::PyOtlpMetricExporterAdapter> {
         // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
-        // In PyO3 pymethods, self is &Self where Self is the PyClass
-        // We can get the Python object using Py::from with explicit conversion
+        // Use PyRef's into_py method which safely converts to Py<Self>
+        // This is the safe alternative that properly manages reference counts
         use crate::python::adapters::LibraryRef;
-        // PyClass instances implement PyNativeType, so we can use Py::from
-        // But we need to get the Python object reference first
-        // The simplest approach: use Py::from with the Python object obtained via GIL
+        // PyRef::into_py returns Py<PyAny>, we need to cast to Py<Self>
+        // SAFETY: We know the type is correct because slf is PyRef<Self>
+        // The reference count is already managed by PyRef::into_py, so we just need to cast
+        let py_any: Py<PyAny> = slf.into_py(py);
         let library_ref: LibraryRef = unsafe {
-            // Get the Python object pointer from self
-            // PyClass instances are Python objects, so we can get the pointer
-            let py_ptr = self as *const Self as *mut pyo3::ffi::PyObject;
-            Py::from_borrowed_ptr(py, py_ptr)
+            // Cast Py<PyAny> to Py<Self> - safe because we know the type is correct
+            std::mem::transmute(py_any)
         };
         Ok(crate::python::adapters::PyOtlpMetricExporterAdapter {
             library: library_ref,
@@ -263,21 +262,18 @@ impl PyOtlpLibrary {
     ///     processor = BatchSpanProcessor(span_exporter)
     ///     ```
     pub fn span_exporter_adapter(
-        &self,
+        slf: PyRef<'_, Self>,
         py: Python<'_>,
     ) -> PyResult<crate::python::adapters::PyOtlpSpanExporterAdapter> {
         // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
-        // In PyO3 pymethods, self is &Self where Self is the PyClass
-        // We can get the Python object using Py::from with explicit conversion
+        // Use PyRef's into_py method which safely converts to Py<Self>
+        // This is the safe alternative that properly manages reference counts
         use crate::python::adapters::LibraryRef;
-        // PyClass instances implement PyNativeType, so we can use Py::from
-        // But we need to get the Python object reference first
-        // The simplest approach: use Py::from with the Python object obtained via GIL
+        // PyRef::into_py returns Py<PyAny>, we need to cast to Py<Self>
+        // SAFETY: We know the type is correct because slf is PyRef<Self>
         let library_ref: LibraryRef = unsafe {
-            // Get the Python object pointer from self
-            // PyClass instances are Python objects, so we can get the pointer
-            let py_ptr = self as *const Self as *mut pyo3::ffi::PyObject;
-            Py::from_borrowed_ptr(py, py_ptr)
+            let py_any: Py<PyAny> = slf.into_py(py);
+            Py::from_owned_ptr(py, py_any.as_ptr())
         };
         Ok(crate::python::adapters::PyOtlpSpanExporterAdapter {
             library: library_ref,

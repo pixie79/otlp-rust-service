@@ -5,6 +5,8 @@ release/
 *.rs.bk
 *.rlib
 *.prof*
+scripts/__pycache__/*
+tests/python/__pycache__/*
 
 # IDE
 .idea/

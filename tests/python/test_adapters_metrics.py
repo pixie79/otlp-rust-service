@@ -1,7 +1,6 @@
 """Tests for Python OpenTelemetry SDK metric exporter adapter"""
 
 import tempfile
-import os
 import pytest
 
 

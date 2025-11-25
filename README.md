@@ -86,8 +86,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let library = OtlpLibrary::new(config).await?;
 
     // Create exporters for OpenTelemetry SDK
-    let metric_exporter = library.metric_exporter();
-    let span_exporter = library.span_exporter();
+    let metric_exporter = library.metric_exporter_adapter();
+    let span_exporter = library.span_exporter_adapter();
 
     // Use with OpenTelemetry SDK
     let metric_reader = PeriodicReader::builder(metric_exporter)
@@ -157,8 +157,8 @@ library = otlp_arrow_library.PyOtlpLibrary(
 )
 
 # Create exporters for OpenTelemetry SDK integration
-metric_exporter = library.metric_exporter()
-span_exporter = library.span_exporter()
+metric_exporter = library.metric_exporter_adapter()
+span_exporter = library.span_exporter_adapter()
 
 # Note: Direct Python OpenTelemetry SDK integration requires
 # adapter classes (see Issue #6). For now, use library methods directly.

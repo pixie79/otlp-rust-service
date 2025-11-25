@@ -9,11 +9,6 @@ use otlp_arrow_library::python::adapters::conversion::{
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-/// Helper to create a Python interpreter for testing
-fn python() -> Python {
-    Python::with_gil(|py| py)
-}
-
 #[test]
 fn test_convert_metric_export_result_to_dict() {
     Python::with_gil(|py| {

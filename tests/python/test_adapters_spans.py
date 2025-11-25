@@ -1,7 +1,6 @@
 """Tests for Python OpenTelemetry SDK span exporter adapter"""
 
 import tempfile
-import os
 import pytest
 
 

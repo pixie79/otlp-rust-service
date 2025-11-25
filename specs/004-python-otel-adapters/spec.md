@@ -3,7 +3,7 @@
 **Feature Branch**: `004-python-otel-adapters`  
 **Created**: 2025-11-25  
 **Status**: Draft  
-**Input**: User description: "Review the following issue and its commnets - [Issue #6](https://github.com/pixie79/otlp-rust-service/issues/6)"
+**Input**: User description: "Review the following issue and its comments - [Issue #6](https://github.com/pixie79/otlp-rust-service/issues/6)"
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -17,7 +17,7 @@ A Python developer wants to integrate the library with Python OpenTelemetry SDK'
 
 **Acceptance Scenarios**:
 
-1. **Given** a Python `OtlpLibrary` instance is created, **When** a developer calls `metric_exporter()` method, **Then** the method returns a Python class that implements Python OpenTelemetry SDK's `MetricExporter` interface
+1. **Given** a Python `OtlpLibrary` instance is created, **When** a developer calls `metric_exporter_adapter()` method, **Then** the method returns a Python class that implements Python OpenTelemetry SDK's `MetricExporter` interface
 2. **Given** a metric exporter adapter is created from the library, **When** it is used with Python OpenTelemetry SDK's `PeriodicExportingMetricReader`, **Then** metrics are automatically exported to the library's storage system at the configured intervals
 3. **Given** a metric exporter adapter is used with Python OpenTelemetry SDK, **When** Python OpenTelemetry SDK calls the `export` method with Python metric data, **Then** the adapter converts Python metric types to library-compatible formats and exports them correctly
 4. **Given** a metric exporter adapter is used with Python OpenTelemetry SDK, **When** errors occur during export, **Then** the adapter converts library errors to appropriate Python OpenTelemetry SDK error types while preserving error context
@@ -35,7 +35,7 @@ A Python developer wants to integrate the library with Python OpenTelemetry SDK'
 
 **Acceptance Scenarios**:
 
-1. **Given** a Python `OtlpLibrary` instance is created, **When** a developer calls `span_exporter()` method, **Then** the method returns a Python class that implements Python OpenTelemetry SDK's `SpanExporter` interface
+1. **Given** a Python `OtlpLibrary` instance is created, **When** a developer calls `span_exporter_adapter()` method, **Then** the method returns a Python class that implements Python OpenTelemetry SDK's `SpanExporter` interface
 2. **Given** a span exporter adapter is created from the library, **When** it is used with Python OpenTelemetry SDK's `BatchSpanProcessor` and `TracerProvider`, **Then** spans are automatically exported to the library's storage system when batches are ready
 3. **Given** a span exporter adapter is used with Python OpenTelemetry SDK, **When** Python OpenTelemetry SDK calls the `export` method with Python span data, **Then** the adapter converts Python span types to library-compatible formats and exports them correctly
 4. **Given** a span exporter adapter is used with Python OpenTelemetry SDK, **When** errors occur during export, **Then** the adapter converts library errors to appropriate Python OpenTelemetry SDK error types while preserving error context
@@ -79,12 +79,12 @@ A Python developer wants to use the adapter classes across different operating s
 
 ### Functional Requirements
 
-- **FR-001**: Library MUST provide a `metric_exporter()` method on Python `OtlpLibrary` that returns a Python class implementing Python OpenTelemetry SDK's `MetricExporter` interface
+- **FR-001**: Library MUST provide a `metric_exporter_adapter()` method on Python `OtlpLibrary` that returns a Python class implementing Python OpenTelemetry SDK's `MetricExporter` interface
 - **FR-002**: The returned Python metric exporter adapter MUST implement all required methods of Python OpenTelemetry SDK's `MetricExporter` interface
 - **FR-003**: The Python metric exporter adapter MUST delegate metric export operations to the underlying `OtlpLibrary` instance's Python API methods
 - **FR-004**: The Python metric exporter adapter MUST convert Python OpenTelemetry SDK metric types to library-compatible formats before exporting
 - **FR-005**: The Python metric exporter adapter MUST convert library errors (`OtlpError`) to appropriate Python OpenTelemetry SDK error types
-- **FR-006**: Library MUST provide a `span_exporter()` method on Python `OtlpLibrary` that returns a Python class implementing Python OpenTelemetry SDK's `SpanExporter` interface
+- **FR-006**: Library MUST provide a `span_exporter_adapter()` method on Python `OtlpLibrary` that returns a Python class implementing Python OpenTelemetry SDK's `SpanExporter` interface
 - **FR-007**: The returned Python span exporter adapter MUST implement all required methods of Python OpenTelemetry SDK's `SpanExporter` interface
 - **FR-008**: The Python span exporter adapter MUST delegate span export operations to the underlying `OtlpLibrary` instance's Python API methods
 - **FR-009**: The Python span exporter adapter MUST convert Python OpenTelemetry SDK span types to library-compatible formats before exporting

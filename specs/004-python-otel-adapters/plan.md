@@ -152,8 +152,8 @@ See `data-model.md` for entity definitions:
 ### API Contracts
 
 See `contracts/python-api.md` for:
-- `metric_exporter()` method contract
-- `span_exporter()` method contract
+- `metric_exporter_adapter()` method contract
+- `span_exporter_adapter()` method contract
 - Adapter class interfaces
 - Error handling contracts
 

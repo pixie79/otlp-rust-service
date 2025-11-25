@@ -134,7 +134,9 @@ impl PyOtlpMetricExporterAdapter {
     ///
     /// Implements Python OpenTelemetry SDK's MetricExporter.shutdown() method.
     /// This is a no-op because library shutdown is handled separately.
-    pub fn shutdown(&self, _py: Python<'_>) -> PyResult<()> {
+    #[pyo3(signature = (*, timeout_millis=None))]
+    #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
+    pub fn shutdown(&self, timeout_millis: Option<u64>, _py: Python<'_>) -> PyResult<()> {
         // No-op: library shutdown is separate operation
         Ok(())
     }
@@ -328,7 +330,9 @@ impl PyOtlpSpanExporterAdapter {
     ///
     /// Implements Python OpenTelemetry SDK's SpanExporter.shutdown() method.
     /// This is a no-op because library shutdown is handled separately.
-    pub fn shutdown(&self, _py: Python<'_>) -> PyResult<()> {
+    #[pyo3(signature = (*, timeout_millis=None))]
+    #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
+    pub fn shutdown(&self, timeout_millis: Option<u64>, _py: Python<'_>) -> PyResult<()> {
         // No-op: library shutdown is separate operation
         Ok(())
     }

@@ -102,7 +102,7 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
 # Setup
 library = otlp_arrow_library.PyOtlpLibrary(output_dir="./otlp_output")
-metric_exporter = library.metric_exporter()
+metric_exporter = library.metric_exporter_adapter()
 reader = PeriodicExportingMetricReader(metric_exporter, export_interval_millis=5000)
 meter_provider = MeterProvider(metric_readers=[reader])
 metrics.set_meter_provider(meter_provider)
@@ -178,7 +178,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 # Setup
 library = otlp_arrow_library.PyOtlpLibrary(output_dir="./otlp_output")
-span_exporter = library.span_exporter()
+span_exporter = library.span_exporter_adapter()
 processor = BatchSpanProcessor(span_exporter)
 tracer_provider = TracerProvider()
 tracer_provider.add_span_processor(processor)
@@ -209,13 +209,13 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 library = otlp_arrow_library.PyOtlpLibrary(output_dir="./otlp_output")
 
 # Setup metrics
-metric_exporter = library.metric_exporter()
+metric_exporter = library.metric_exporter_adapter()
 metric_reader = PeriodicExportingMetricReader(metric_exporter, export_interval_millis=5000)
 meter_provider = MeterProvider(metric_readers=[metric_reader])
 metrics.set_meter_provider(meter_provider)
 
 # Setup traces
-span_exporter = library.span_exporter()
+span_exporter = library.span_exporter_adapter()
 span_processor = BatchSpanProcessor(span_exporter)
 tracer_provider = TracerProvider()
 tracer_provider.add_span_processor(span_processor)
@@ -298,7 +298,7 @@ tracer_provider = TracerProvider(resource=resource)
 
 ```python
 try:
-    metric_exporter = library.metric_exporter()
+    metric_exporter = library.metric_exporter_adapter()
 except RuntimeError as e:
     print(f"Failed to create metric exporter: {e}")
     # Handle error
