@@ -7,6 +7,7 @@
 pub mod conversion;
 
 use crate::python::bindings::PyOtlpLibrary;
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 
 /// Python garbage collection handling utilities
@@ -152,9 +153,15 @@ impl PyOtlpMetricExporterAdapter {
         }
 
         // Delegate to library.flush()
+        // Extract the library and runtime from the borrowed reference
         let library_ref = self.library.borrow(py);
-        library_ref
-            .flush()
+        let library = library_ref.library.clone();
+        let runtime = library_ref.runtime.clone();
+        drop(library_ref); // Release PyRef
+        
+        // Call flush directly without releasing GIL (same pattern as other methods)
+        runtime
+            .block_on(async move { library.flush().await })
             .map_err(|e| error_message_to_py(format!("Failed to flush metrics: {}", e)))?;
 
         // Return ExportResult.SUCCESS
@@ -330,9 +337,15 @@ impl PyOtlpSpanExporterAdapter {
         }
 
         // Delegate to library.flush()
+        // Extract the library and runtime from the borrowed reference
         let library_ref = self.library.borrow(py);
-        library_ref
-            .flush()
+        let library = library_ref.library.clone();
+        let runtime = library_ref.runtime.clone();
+        drop(library_ref); // Release PyRef
+        
+        // Call flush directly without releasing GIL (same pattern as other methods)
+        runtime
+            .block_on(async move { library.flush().await })
             .map_err(|e| error_message_to_py(format!("Failed to flush spans: {}", e)))?;
 
         // Return SpanExportResult.SUCCESS

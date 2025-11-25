@@ -23,8 +23,8 @@ use tokio::runtime::Runtime;
 /// Python wrapper for OtlpLibrary
 #[pyclass]
 pub struct PyOtlpLibrary {
-    library: Arc<OtlpLibrary>,
-    runtime: Arc<Runtime>,
+    pub(crate) library: Arc<OtlpLibrary>,
+    pub(crate) runtime: Arc<Runtime>,
 }
 
 #[pymethods]
