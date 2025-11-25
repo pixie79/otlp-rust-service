@@ -60,6 +60,7 @@ pyo3 = { version = "0.20", features = ["auto-initialize", "extension-module"] }
 [lib]
 name = "otlp_arrow_library"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "otlp-arrow-service"
