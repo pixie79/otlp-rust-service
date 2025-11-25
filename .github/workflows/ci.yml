@@ -86,9 +86,10 @@ jobs:
       - name: Build Python bindings
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install maturin
           python3 -m venv .venv
           source .venv/bin/activate
+          # Install maturin in the venv to ensure it uses the correct Python
+          .venv/bin/pip install maturin
           maturin develop --release
           # Verify module is installed (use venv Python)
           .venv/bin/python -c "import otlp_arrow_library; print('Module installed successfully')"
@@ -149,9 +150,10 @@ jobs:
       - name: Build Python bindings
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install maturin
           python3 -m venv .venv
           source .venv/bin/activate
+          # Install maturin in the venv to ensure it uses the correct Python
+          .venv/bin/pip install maturin
           maturin develop --release
           # Verify module is installed (use venv Python)
           .venv/bin/python -c "import otlp_arrow_library; print('Module installed successfully')"
