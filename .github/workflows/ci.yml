@@ -100,7 +100,7 @@ jobs:
         run: |
           # Use venv Python directly to ensure correct environment
           .venv/bin/python -c "import otlp_arrow_library; print('Module available:', otlp_arrow_library.__file__)" || (echo "ERROR: Module not found in venv" && exit 1)
-          .venv/bin/pip install pytest
+          .venv/bin/pip install pytest opentelemetry-api opentelemetry-sdk
           # Run Python tests - fail if any test files exist but tests fail
           if [ -n "$(find tests/python -name 'test_*.py' -type f 2>/dev/null)" ]; then
             .venv/bin/pytest tests/python/ -v
@@ -166,7 +166,7 @@ jobs:
         run: |
           # Use venv Python directly to ensure correct environment
           .venv/bin/python -c "import otlp_arrow_library; print('Module available:', otlp_arrow_library.__file__)" || (echo "ERROR: Module not found in venv" && exit 1)
-          .venv/bin/pip install pytest
+          .venv/bin/pip install pytest opentelemetry-api opentelemetry-sdk
           # Run Python tests - fail if any test files exist but tests fail
           if [ -n "$(find tests/python -name 'test_*.py' -type f 2>/dev/null)" ]; then
             .venv/bin/pytest tests/python/ -v

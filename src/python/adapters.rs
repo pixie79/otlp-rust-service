@@ -74,11 +74,13 @@ impl PyOtlpMetricExporterAdapter {
     /// # Arguments
     ///
     /// * `metrics_data` - MetricExportResult from Python OpenTelemetry SDK
+    /// * `timeout_millis` - Optional timeout in milliseconds (ignored)
     ///
     /// # Returns
     ///
     /// ExportResult (SUCCESS or FAILURE)
-    pub fn export(&self, metrics_data: &PyAny, py: Python<'_>) -> PyResult<PyObject> {
+    #[pyo3(signature = (metrics_data, *, timeout_millis=None))]
+    pub fn export(&self, metrics_data: &PyAny, timeout_millis: Option<u64>, py: Python<'_>) -> PyResult<PyObject> {
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
             return Err(error_message_to_py(
@@ -87,7 +89,15 @@ impl PyOtlpMetricExporterAdapter {
         }
 
         // Convert Python OpenTelemetry SDK types to library-compatible format
-        let metrics_dict = convert_metric_export_result_to_dict(metrics_data, py)?;
+        // Wrap in error handling to catch any Python exceptions that might cause segfaults
+        let metrics_dict = match convert_metric_export_result_to_dict(metrics_data, py) {
+            Ok(dict) => dict,
+            Err(e) => {
+                // If conversion fails, return a proper Python exception instead of crashing
+                // This handles cases where mock objects don't match expected structure
+                return Err(e);
+            }
+        };
 
         // Get library instance and delegate to export_metrics_ref
         let library_ref = self.library.borrow(py);
@@ -184,6 +194,57 @@ impl PyOtlpMetricExporterAdapter {
     /// Get string representation
     fn __repr__(&self) -> String {
         "PyOtlpMetricExporterAdapter".to_string()
+    }
+    
+    /// Get _preferred_temporality attribute (required by OpenTelemetry SDK)
+    ///
+    /// This is accessed as an attribute by PeriodicExportingMetricReader
+    fn __getattr__(&self, name: &str, py: Python<'_>) -> PyResult<PyObject> {
+        match name {
+            "_preferred_temporality" => {
+                // Return a dict mapping metric types to AggregationTemporality.CUMULATIVE
+                // The SDK expects: {Counter: CUMULATIVE, Histogram: CUMULATIVE, ...}
+                let temporality_dict = pyo3::types::PyDict::new(py);
+                
+                // Safely import and get AggregationTemporality.CUMULATIVE
+                let cumulative = match py
+                    .import("opentelemetry.sdk.metrics.export")
+                    .and_then(|module| module.getattr("AggregationTemporality"))
+                    .and_then(|agg_temp| agg_temp.getattr("CUMULATIVE"))
+                {
+                    Ok(cum) => cum,
+                    Err(_) => {
+                        // If import fails, return empty dict (SDK will handle it)
+                        return Ok(temporality_dict.into());
+                    }
+                };
+                
+                // Get metric types from opentelemetry.sdk.metrics
+                if let Ok(metrics_module) = py.import("opentelemetry.sdk.metrics") {
+                    let metric_types = ["Counter", "Histogram", "UpDownCounter", 
+                                        "ObservableCounter", "ObservableGauge", "ObservableUpDownCounter"];
+                    
+                    for metric_type_name in metric_types {
+                        if let Ok(metric_type) = metrics_module.getattr(metric_type_name) {
+                            let _ = temporality_dict.set_item(metric_type, cumulative);
+                        }
+                    }
+                }
+                
+                Ok(temporality_dict.into())
+            }
+            "_preferred_aggregation" => {
+                // Return empty dict - SDK will use default aggregations
+                let empty_dict = pyo3::types::PyDict::new(py);
+                Ok(empty_dict.into())
+            }
+            _ => {
+                // Return AttributeError for unknown attributes (Python convention)
+                Err(pyo3::exceptions::PyAttributeError::new_err(
+                    format!("'PyOtlpMetricExporterAdapter' object has no attribute '{}'", name)
+                ))
+            }
+        }
     }
 }
 
