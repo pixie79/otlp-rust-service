@@ -14,7 +14,13 @@ fn create_test_span(name: &str) -> SpanData {
     let trace_id = TraceId::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     let span_id = SpanId::from_bytes([1, 2, 3, 4, 5, 6, 7, 8]);
     
-    let span_context = SpanContext::new(trace_id, span_id, TraceFlags::default(), false);
+    let span_context = SpanContext::new(
+        trace_id,
+        span_id,
+        TraceFlags::default(),
+        false,
+        opentelemetry::trace::TraceState::default(),
+    );
     
     SpanData {
         span_context,
@@ -44,6 +50,7 @@ async fn test_otlp_span_exporter_export() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let library = OtlpLibrary::new(config).await.unwrap();
@@ -70,6 +77,7 @@ async fn test_otlp_span_exporter_shutdown() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let library = OtlpLibrary::new(config).await.unwrap();
@@ -96,6 +104,7 @@ async fn test_otlp_span_exporter_error_conversion() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let library = OtlpLibrary::new(config).await.unwrap();

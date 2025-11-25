@@ -98,8 +98,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_reader(metric_reader)
         .build();
 
-    let tracer_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
-        .with_batch_exporter(span_exporter)
+    let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
+        .with_batch_exporter(span_exporter, opentelemetry_sdk::runtime::Tokio)
         .build();
 
     // Use providers to create meters and tracers

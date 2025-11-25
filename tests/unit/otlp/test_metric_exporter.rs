@@ -1,10 +1,8 @@
 //! Unit tests for OtlpMetricExporter
 
 use otlp_arrow_library::{Config, OtlpLibrary, OtlpMetricExporter};
-use opentelemetry::KeyValue;
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::metrics::Temporality;
-use opentelemetry_sdk::Resource;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,10 +10,9 @@ use tempfile::TempDir;
 
 /// Helper function to create a simple test metric
 fn create_test_metric() -> ResourceMetrics {
-    ResourceMetrics {
-        resource: Resource::new(vec![KeyValue::new("service.name", "test-service")]),
-        scope_metrics: vec![],
-    }
+    // Note: ResourceMetrics fields are private in opentelemetry-sdk 0.31,
+    // so we use default() like the rest of the codebase
+    ResourceMetrics::default()
 }
 
 #[tokio::test]
@@ -29,6 +26,7 @@ async fn test_otlp_metric_exporter_export() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let library = OtlpLibrary::new(config).await.unwrap();
@@ -55,6 +53,7 @@ async fn test_otlp_metric_exporter_force_flush() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let library = OtlpLibrary::new(config).await.unwrap();
@@ -76,6 +75,7 @@ async fn test_otlp_metric_exporter_shutdown_with_timeout() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let library = OtlpLibrary::new(config).await.unwrap();
@@ -102,6 +102,7 @@ async fn test_otlp_metric_exporter_temporality_returns_cumulative() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let library = OtlpLibrary::new(config).await.unwrap();
@@ -127,6 +128,7 @@ async fn test_otlp_metric_exporter_error_conversion() {
         metric_cleanup_interval_secs: 3600,
         protocols: Default::default(),
         forwarding: None,
+        dashboard: Default::default(),
     };
 
     let library = OtlpLibrary::new(config).await.unwrap();
