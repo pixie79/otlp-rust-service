@@ -7,41 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2024-11-25
+
 ### Added
-- **JavaScript/TypeScript/CSS Formatting and Linting**: Added comprehensive code quality checks for all languages in the codebase
-  - Added Prettier configuration for formatting JavaScript, TypeScript, CSS, JSON, YAML, Markdown, and HTML files
-  - Added ESLint configuration for linting JavaScript and TypeScript files
-  - Updated constitution to require formatting and linting checks for all languages before commits
-  - Enhanced CI pipeline to run JavaScript/TypeScript formatting and linting checks
-  - Added npm scripts: `format`, `format:check`, `lint`, `lint:fix` to dashboard package.json
-  - Fixed all ESLint errors in test files and benchmark scripts
-
-### Changed
-
-#### Web Realtime Dashboard
-- **Web JS-based Realtime Dashboard**: Client-side web application for real-time visualization of OTLP traces and metrics
-- **Live Trace Tail Viewer**: Real-time display of trace data as it arrives, with filtering and detail pane
-- **Real-time Metrics Graphing**: Dynamic visualization of metric data over time using Plotly.js
-- **Arrow IPC File Streaming**: Direct client-side reading of Arrow IPC files using File System Access API or FileReader API
-- **DuckDB-wasm Integration**: Efficient in-browser querying of Arrow IPC files using DuckDB WebAssembly
-- **Interactive Dashboard UI**: Responsive design with keyboard navigation, search, and accessibility features (WCAG 2.1 AA)
-- **Rust Service Integration**: Optional HTTP server in Rust service to serve dashboard static files (disabled by default)
-- **Configuration UI**: Settings panel for configuring polling interval, data limits, and memory management
-- **Error Boundary**: Graceful error handling with user-friendly error messages
-- **Browser Compatibility Detection**: Automatic detection and graceful degradation for unsupported browsers
-- **Data Limits**: Configurable limits for traces, graph points, and loaded tables with automatic cleanup
-- **State Persistence**: Dashboard state (view, pause state, time range) persisted in localStorage
-- **Performance Optimizations**: Virtual scrolling for large trace lists, Plotly extendTraces for efficient graph updates, LRU cache for DuckDB tables
-- **Comprehensive Testing**: Unit tests, integration tests, and E2E tests (Playwright) for all dashboard features
-
-#### Dashboard Configuration
-- `dashboard.enabled`: Enable/disable dashboard HTTP server (default: false)
-- `dashboard.port`: Port for dashboard HTTP server (default: 8080)
-- `dashboard.static_dir`: Directory containing dashboard static files (default: "./dashboard/dist")
-- `dashboard.bind_address`: Bind address for dashboard HTTP server (default: "127.0.0.1" for local-only access, use "0.0.0.0" for network access)
-- Environment variable overrides: `OTLP_DASHBOARD_ENABLED`, `OTLP_DASHBOARD_PORT`, `OTLP_DASHBOARD_STATIC_DIR`, `OTLP_DASHBOARD_BIND_ADDRESS`
-
-## [0.2.0] - 2024-11-25
 
 ### Added
 - **Built-in OpenTelemetry SDK Exporter Implementations**: Added `OtlpMetricExporter` and `OtlpSpanExporter` types that implement OpenTelemetry SDK's `PushMetricExporter` and `SpanExporter` traits, enabling direct integration with OpenTelemetry SDK without custom wrapper code
