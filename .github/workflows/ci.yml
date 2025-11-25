@@ -90,14 +90,17 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           maturin develop --release
+          # Verify module is installed
+          python3 -c "import otlp_arrow_library; print('Module installed successfully')"
       
       - name: Run Python tests
         run: |
-          source .venv/bin/activate
-          python3 -m pip install pytest
+          # Use venv Python directly to ensure correct environment
+          .venv/bin/python -c "import otlp_arrow_library; print('Module available:', otlp_arrow_library.__file__)" || (echo "ERROR: Module not found in venv" && exit 1)
+          .venv/bin/pip install pytest
           # Run Python tests - fail if any test files exist but tests fail
           if [ -n "$(find tests/python -name 'test_*.py' -type f 2>/dev/null)" ]; then
-            python3 -m pytest tests/python/ -v
+            .venv/bin/pytest tests/python/ -v
           else
             echo "No Python test files found, skipping Python tests"
           fi
@@ -150,14 +153,17 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           maturin develop --release
+          # Verify module is installed
+          python3 -c "import otlp_arrow_library; print('Module installed successfully')"
       
       - name: Run Python tests
         run: |
-          source .venv/bin/activate
-          python3 -m pip install pytest
+          # Use venv Python directly to ensure correct environment
+          .venv/bin/python -c "import otlp_arrow_library; print('Module available:', otlp_arrow_library.__file__)" || (echo "ERROR: Module not found in venv" && exit 1)
+          .venv/bin/pip install pytest
           # Run Python tests - fail if any test files exist but tests fail
           if [ -n "$(find tests/python -name 'test_*.py' -type f 2>/dev/null)" ]; then
-            python3 -m pytest tests/python/ -v
+            .venv/bin/pytest tests/python/ -v
           else
             echo "No Python test files found, skipping Python tests"
           fi
