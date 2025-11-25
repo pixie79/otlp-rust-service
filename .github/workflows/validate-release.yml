@@ -46,6 +46,13 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Cargo.toml version: $VERSION"
 
+      - name: Extract version from pyproject.toml
+        id: pyproject-version
+        run: |
+          VERSION=$(grep -E '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "pyproject.toml version: $VERSION"
+
       - name: Extract version from CHANGELOG.md
         id: changelog-version
         run: |
@@ -62,20 +69,34 @@ jobs:
       - name: Validate versions match
         run: |
           CARGO_VERSION="${{ steps.cargo-version.outputs.version }}"
+          PYPROJECT_VERSION="${{ steps.pyproject-version.outputs.version }}"
           CHANGELOG_VERSION="${{ steps.changelog-version.outputs.version }}"
           
+          # Check Cargo.toml matches pyproject.toml
+          if [ "$CARGO_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "❌ Version mismatch detected!"
+            echo "   Cargo.toml version: $CARGO_VERSION"
+            echo "   pyproject.toml version: $PYPROJECT_VERSION"
+            echo ""
+            echo "The Python bindings version must match the Rust crate version."
+            exit 1
+          fi
+          
+          # Check Cargo.toml matches CHANGELOG.md (if CHANGELOG has a version)
           if [ -z "$CHANGELOG_VERSION" ]; then
             echo "⚠️  CHANGELOG.md only has [Unreleased] entries. This is acceptable for feature PRs."
-            echo "✅ Version validation skipped (will be validated on release)"
+            echo "✅ Cargo.toml and pyproject.toml versions match: $CARGO_VERSION"
+            echo "✅ Version validation skipped for CHANGELOG (will be validated on release)"
           elif [ "$CARGO_VERSION" != "$CHANGELOG_VERSION" ]; then
             echo "❌ Version mismatch detected!"
             echo "   Cargo.toml version: $CARGO_VERSION"
+            echo "   pyproject.toml version: $PYPROJECT_VERSION"
             echo "   CHANGELOG.md version: $CHANGELOG_VERSION"
             echo ""
-            echo "Please ensure versions match before merging."
+            echo "Please ensure all versions match before merging."
             exit 1
           else
-            echo "✅ Versions match: $CARGO_VERSION"
+            echo "✅ All versions match: $CARGO_VERSION"
           fi
 
       - name: Validate CHANGELOG format
@@ -144,6 +165,13 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Cargo.toml version: $VERSION"
 
+      - name: Update pyproject.toml version (if needed)
+        run: |
+          VERSION="${{ steps.cargo-version.outputs.version }}"
+          # Update both [project] and [project.metadata] version fields
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+          echo "✅ Updated pyproject.toml version to $VERSION"
+
       - name: Update CHANGELOG with release date
         run: |
           VERSION="${{ steps.cargo-version.outputs.version }}"
@@ -165,12 +193,24 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          if git diff --quiet CHANGELOG.md; then
-            echo "No changes to CHANGELOG.md"
+          CHANGED_FILES=""
+          if ! git diff --quiet CHANGELOG.md; then
+            CHANGED_FILES="CHANGELOG.md"
+          fi
+          if ! git diff --quiet pyproject.toml; then
+            if [ -n "$CHANGED_FILES" ]; then
+              CHANGED_FILES="$CHANGED_FILES pyproject.toml"
+            else
+              CHANGED_FILES="pyproject.toml"
+            fi
+          fi
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changes to commit"
           else
-            git add CHANGELOG.md
-            git commit -m "chore(release): update CHANGELOG.md with release date for ${{ steps.cargo-version.outputs.version }}"
+            git add $CHANGED_FILES
+            git commit -m "chore(release): update release info for ${{ steps.cargo-version.outputs.version }}"
             git push origin main
-            echo "✅ Pushed CHANGELOG.md update to main"
+            echo "✅ Pushed release info update to main: $CHANGED_FILES"
           fi
 

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - 2025-01-27
+## [0.3.0] - 2025-11-25
 
 ### Added
 - **Built-in OpenTelemetry SDK Exporter Implementations**: Added `OtlpMetricExporter` and `OtlpSpanExporter` types that implement OpenTelemetry SDK's `PushMetricExporter` and `SpanExporter` traits, enabling direct integration with OpenTelemetry SDK without custom wrapper code
@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `PyOtlpLibrary.span_exporter()` - Returns `PyOtlpSpanExporter` instance
   - Foundation for future Python OpenTelemetry SDK integration (tracked in Issue #6)
 
-## [0.2.0] - 2024-11-24
+## [0.2.0] - 2025-11-24
 
 ### Added
 - **JavaScript/TypeScript/CSS Formatting and Linting**: Added comprehensive code quality checks for all languages in the codebase
@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dashboard.bind_address`: Bind address for dashboard HTTP server (default: "127.0.0.1" for local-only access, use "0.0.0.0" for network access)
 - Environment variable overrides: `OTLP_DASHBOARD_ENABLED`, `OTLP_DASHBOARD_PORT`, `OTLP_DASHBOARD_STATIC_DIR`, `OTLP_DASHBOARD_BIND_ADDRESS`
 
-## [0.1.0] - 2024-11-23
+## [0.1.0] - 2025-11-23
 
 ### Added
 

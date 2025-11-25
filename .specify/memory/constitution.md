@@ -115,6 +115,9 @@ This workflow ensures code quality, documentation accuracy, and commit authentic
 - Code coverage MUST not decrease below 85% threshold per file (Rust)
 - CHANGELOG.md MUST be current (see Commit Workflow)
 - All documentation MUST be updated (see Commit Workflow)
+- **Version consistency**: Cargo.toml, pyproject.toml, and CHANGELOG.md versions MUST match before commit
+  - Run `scripts/validate-versions.sh` to validate version consistency
+  - Pre-commit hook automatically validates versions (if installed)
 
 ### CI/CD Pipeline Gates
 
