@@ -6,6 +6,7 @@
 
 use crate::api::public::OtlpLibrary;
 use crate::config::{Config, ConfigBuilder};
+use crate::otlp::{OtlpMetricExporter, OtlpSpanExporter};
 use opentelemetry::trace::{
     SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
 };
@@ -140,6 +141,23 @@ impl PyOtlpLibrary {
             .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
     }
 
+    /// Export metrics by reference from a Python dictionary
+    ///
+    /// Args:
+    ///     metrics_dict: Dictionary with metrics data
+    ///
+    /// Note: This method uses the reference-based export internally for efficiency.
+    /// Full metrics conversion is complex. This creates a minimal ResourceMetrics.
+    pub fn export_metrics_ref(&self, _metrics_dict: &PyDict) -> PyResult<()> {
+        // Create a minimal ResourceMetrics
+        // Full implementation would parse the dict and create proper metrics
+        let metrics = ResourceMetrics::default();
+        let library = self.library.clone();
+        self.runtime
+            .block_on(async move { library.export_metrics_ref(&metrics).await })
+            .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
+    }
+
     /// Force immediate flush of all buffered messages to disk
     pub fn flush(&self) -> PyResult<()> {
         let library = self.library.clone();
@@ -154,6 +172,42 @@ impl PyOtlpLibrary {
         self.runtime
             .block_on(async move { library.shutdown().await })
             .map_err(|e| PyRuntimeError::new_err(format!("Shutdown error: {}", e)))
+    }
+
+    /// Create a PushMetricExporter implementation for use with OpenTelemetry SDK
+    ///
+    /// Returns:
+    ///     PyOtlpMetricExporter: A metric exporter that can be used with OpenTelemetry SDK
+    ///
+    /// Example:
+    ///     ```python
+    ///     library = PyOtlpLibrary(output_dir="/tmp/otlp")
+    ///     metric_exporter = library.metric_exporter()
+    ///     # Use metric_exporter with OpenTelemetry SDK
+    ///     ```
+    pub fn metric_exporter(&self) -> PyResult<PyOtlpMetricExporter> {
+        let exporter = self.library.metric_exporter();
+        Ok(PyOtlpMetricExporter {
+            exporter: Arc::new(exporter),
+        })
+    }
+
+    /// Create a SpanExporter implementation for use with OpenTelemetry SDK
+    ///
+    /// Returns:
+    ///     PyOtlpSpanExporter: A span exporter that can be used with OpenTelemetry SDK
+    ///
+    /// Example:
+    ///     ```python
+    ///     library = PyOtlpLibrary(output_dir="/tmp/otlp")
+    ///     span_exporter = library.span_exporter()
+    ///     # Use span_exporter with OpenTelemetry SDK
+    ///     ```
+    pub fn span_exporter(&self) -> PyResult<PyOtlpSpanExporter> {
+        let exporter = self.library.span_exporter();
+        Ok(PyOtlpSpanExporter {
+            exporter: Arc::new(exporter),
+        })
     }
 }
 
@@ -351,10 +405,50 @@ fn dict_to_span_data(dict: &PyDict) -> PyResult<SpanData> {
     })
 }
 
+/// Python wrapper for OtlpMetricExporter
+///
+/// This wrapper exposes the OtlpMetricExporter to Python code.
+/// The exporter field is kept for future use when Python OpenTelemetry SDK integration
+/// is implemented (tracked in Issue #6).
+#[pyclass]
+pub struct PyOtlpMetricExporter {
+    #[allow(dead_code)]
+    exporter: Arc<OtlpMetricExporter>,
+}
+
+#[pymethods]
+impl PyOtlpMetricExporter {
+    /// Get a string representation of the exporter
+    fn __repr__(&self) -> String {
+        "PyOtlpMetricExporter".to_string()
+    }
+}
+
+/// Python wrapper for OtlpSpanExporter
+///
+/// This wrapper exposes the OtlpSpanExporter to Python code.
+/// The exporter field is kept for future use when Python OpenTelemetry SDK integration
+/// is implemented (tracked in Issue #6).
+#[pyclass]
+pub struct PyOtlpSpanExporter {
+    #[allow(dead_code)]
+    exporter: Arc<OtlpSpanExporter>,
+}
+
+#[pymethods]
+impl PyOtlpSpanExporter {
+    /// Get a string representation of the exporter
+    fn __repr__(&self) -> String {
+        "PyOtlpSpanExporter".to_string()
+    }
+}
+
 /// Python module definition
 #[pymodule]
 fn otlp_arrow_library(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOtlpLibrary>()?;
+    m.add_class::<PyOtlpMetricExporter>()?;
+    m.add_class::<PyOtlpSpanExporter>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

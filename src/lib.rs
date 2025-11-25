@@ -46,6 +46,7 @@ pub use config::{
 };
 pub use error::{OtlpConfigError, OtlpError, OtlpExportError, OtlpServerError};
 pub use mock::service::MockOtlpService;
+pub use otlp::{OtlpMetricExporter, OtlpSpanExporter};
 
 // Initialize tracing subscriber for structured logging
 use tracing_subscriber::EnvFilter;

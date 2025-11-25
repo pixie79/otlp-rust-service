@@ -5,6 +5,8 @@ Auto-generated from all feature plans. Last updated: 2025-11-23
 ## Active Technologies
 - Local filesystem (Arrow IPC Streaming format files) (001-otlp-arrow-library)
 - Rust stable (latest), Python 3.11+ (001-otlp-arrow-library)
+- Rust 1.75+ (stable channel, latest stable) (003-opentelemetry-exporters)
+- N/A (exporters delegate to existing `OtlpLibrary` file storage) (003-opentelemetry-exporters)
 
 - Rust stable channel (latest stable, minimum 1.75+) (001-otlp-arrow-library)
 
@@ -24,8 +26,8 @@ cargo test [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECH
 Rust stable channel (latest stable, minimum 1.75+): Follow standard conventions
 
 ## Recent Changes
+- 003-opentelemetry-exporters: Added Rust 1.75+ (stable channel, latest stable)
 - 001-otlp-arrow-library: Added Rust stable (latest), Python 3.11+
-- 001-otlp-arrow-library: Added Rust stable channel (latest stable, minimum 1.75+)
 - 001-otlp-arrow-library: Added Rust stable channel (latest stable, minimum 1.75+)
 
 

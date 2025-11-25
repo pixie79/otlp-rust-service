@@ -67,9 +67,10 @@ Before creating any commit, the following MUST be completed in order:
 
 2. **Code Quality Checks**: The following commands MUST pass without errors or warnings for ALL languages in the codebase:
    - **Rust code**:
-     - `cargo fmt` MUST be run to format code (or `cargo fmt --check` must pass)
-     - `cargo clippy -- -D warnings` MUST pass with no warnings
-     - `cargo test` MUST pass (all unit, integration, and documentation tests)
+     - `cargo fmt --all` MUST be run to format code (or `cargo fmt --all -- --check` must pass)
+     - `cargo clippy --all-targets --all-features -- -D warnings` MUST pass with no warnings
+     - `cargo test --all-features --workspace` MUST pass (all unit, integration, and documentation tests)
+     - `cargo test --doc` MUST pass (documentation tests specifically)
    - **JavaScript/TypeScript code** (for dashboard and other JS/TS code):
      - `npm run format:check` or `prettier --check` MUST pass (code formatting)
      - `npm run lint` or `eslint` MUST pass with no errors or warnings
@@ -91,10 +92,10 @@ This workflow ensures code quality, documentation accuracy, and commit authentic
 ### Pre-Commit Checks
 
 **Rust Code:**
-- `cargo fmt --check` MUST pass (code formatting)
-- `cargo clippy -- -D warnings` MUST pass (linting)
-- `cargo test` MUST pass (all tests)
-- `cargo test --doc` MUST pass (documentation tests)
+- `cargo fmt --all -- --check` MUST pass (code formatting for all files, including tests)
+- `cargo clippy --all-targets --all-features -- -D warnings` MUST pass (linting)
+- `cargo test --all-features --workspace` MUST pass (all unit, integration, and documentation tests)
+- `cargo test --doc` MUST pass (documentation tests specifically)
 
 **JavaScript/TypeScript Code:**
 - `npm run format:check` or `prettier --check "dashboard/**/*.{js,ts,jsx,tsx}"` MUST pass (code formatting)
@@ -114,6 +115,9 @@ This workflow ensures code quality, documentation accuracy, and commit authentic
 - Code coverage MUST not decrease below 85% threshold per file (Rust)
 - CHANGELOG.md MUST be current (see Commit Workflow)
 - All documentation MUST be updated (see Commit Workflow)
+- **Version consistency**: Cargo.toml, pyproject.toml, and CHANGELOG.md versions MUST match before commit
+  - Run `scripts/validate-versions.sh` to validate version consistency
+  - Pre-commit hook automatically validates versions (if installed)
 
 ### CI/CD Pipeline Gates
 

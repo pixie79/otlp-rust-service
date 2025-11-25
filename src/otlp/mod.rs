@@ -48,6 +48,9 @@ pub mod server;
 pub mod server_arrow;
 
 pub use batch_writer::BatchBuffer;
-pub use exporter::{ExportFormat, FileMetricExporter, FileSpanExporter, OtlpFileExporter};
+pub use exporter::{
+    ExportFormat, FileMetricExporter, FileSpanExporter, OtlpFileExporter, OtlpMetricExporter,
+    OtlpSpanExporter,
+};
 pub use server::{MetricsServiceImpl, OtlpGrpcServer, TraceServiceImpl};
 pub use server_arrow::OtlpArrowFlightServer;

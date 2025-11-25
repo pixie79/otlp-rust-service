@@ -18,6 +18,8 @@ A cross-platform Rust library for receiving OpenTelemetry Protocol (OTLP) messag
 - **Python Bindings**: PyO3 bindings for Python integration
 - **Health Check**: HTTP health check endpoint for standalone service
 - **Metrics Collection**: Library operation metrics (messages received, files written, errors, conversions)
+- **OpenTelemetry SDK Integration**: Built-in `PushMetricExporter` and `SpanExporter` implementations for seamless integration with OpenTelemetry SDK
+- **Reference-Based Export**: Efficient metric export via `export_metrics_ref()` method that accepts references instead of requiring ownership
 
 ## Quick Start
 
@@ -32,6 +34,8 @@ OTLP_OUTPUT_DIR=./my_output cargo run --bin otlp-arrow-service
 ```
 
 ### As an Embedded Library (Rust)
+
+#### Basic Usage
 
 ```rust
 use otlp_arrow_library::{OtlpLibrary, Config};
@@ -54,6 +58,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Export metrics (automatically converted to protobuf for storage)
     // library.export_metrics(metrics).await?;
 
+    // Export metrics by reference (more efficient)
+    // library.export_metrics_ref(&metrics).await?;
+
     // Force flush
     library.flush().await?;
 
@@ -64,7 +71,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+#### Integration with OpenTelemetry SDK
+
+```rust
+use otlp_arrow_library::OtlpLibrary;
+use opentelemetry_sdk::metrics::{MeterProvider, PeriodicReader};
+use opentelemetry_sdk::trace::TracerProvider;
+use std::time::Duration;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create library instance
+    let config = otlp_arrow_library::Config::default();
+    let library = OtlpLibrary::new(config).await?;
+
+    // Create exporters for OpenTelemetry SDK
+    let metric_exporter = library.metric_exporter();
+    let span_exporter = library.span_exporter();
+
+    // Use with OpenTelemetry SDK
+    let metric_reader = PeriodicReader::builder(metric_exporter)
+        .with_interval(Duration::from_secs(10))
+        .build();
+
+    let meter_provider = MeterProvider::builder()
+        .with_reader(metric_reader)
+        .build();
+
+    let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
+        .with_batch_exporter(span_exporter, opentelemetry_sdk::runtime::Tokio)
+        .build();
+
+    // Use providers to create meters and tracers
+    // Metrics and traces are automatically exported via exporters
+
+    // Shutdown when done
+    library.shutdown().await?;
+    Ok(())
+}
+```
+
 ### As an Embedded Library (Python)
+
+#### Basic Usage
 
 ```python
 import otlp_arrow_library
@@ -87,9 +136,32 @@ span = {
 }
 library.export_trace(span)
 
+# Export metrics by reference (more efficient)
+metrics = {}  # Your metrics dictionary
+library.export_metrics_ref(metrics)
+
 # Flush and shutdown
 library.flush()
 library.shutdown()
+```
+
+#### Exporter Creation
+
+```python
+import otlp_arrow_library
+
+# Initialize library
+library = otlp_arrow_library.PyOtlpLibrary(
+    output_dir="./output",
+    write_interval_secs=5
+)
+
+# Create exporters for OpenTelemetry SDK integration
+metric_exporter = library.metric_exporter()
+span_exporter = library.span_exporter()
+
+# Note: Direct Python OpenTelemetry SDK integration requires
+# adapter classes (see Issue #6). For now, use library methods directly.
 ```
 
 ## Configuration

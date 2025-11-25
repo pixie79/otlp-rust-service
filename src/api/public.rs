@@ -44,7 +44,7 @@ use tracing::{info, warn};
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct OtlpLibrary {
     config: Config,
     file_exporter: Arc<OtlpFileExporter>,
@@ -341,6 +341,104 @@ impl OtlpLibrary {
         } else {
             Ok(()) // Empty metrics, nothing to store
         }
+    }
+
+    /// Export metrics by reference
+    ///
+    /// Adds metrics to the internal buffer by reference, avoiding unnecessary data copying.
+    /// This method is more efficient than `export_metrics` when integrating with OpenTelemetry SDK's
+    /// periodic readers that pass metrics as references rather than owned values.
+    ///
+    /// The metrics will be written to disk when the write interval elapses or when `flush()` is called.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics` - A reference to the OpenTelemetry resource metrics to export
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the metrics were successfully buffered, or `Err(OtlpError)` if
+    /// the buffer is full or an error occurs.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use otlp_arrow_library::OtlpLibrary;
+    /// use opentelemetry_sdk::metrics::data::ResourceMetrics;
+    ///
+    /// # async fn example(library: OtlpLibrary, metrics: &ResourceMetrics) -> Result<(), otlp_arrow_library::OtlpError> {
+    /// library.export_metrics_ref(metrics).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn export_metrics_ref(
+        &self,
+        metrics: &opentelemetry_sdk::metrics::data::ResourceMetrics,
+    ) -> Result<(), OtlpError> {
+        // Convert ResourceMetrics to protobuf for storage (FormatConverter already accepts reference)
+        let converter = crate::otlp::converter::FormatConverter::new();
+        let protobuf_request = converter.resource_metrics_to_protobuf(metrics)?;
+
+        if let Some(request) = protobuf_request {
+            self.batch_buffer.add_metrics_protobuf(request).await
+        } else {
+            Ok(()) // Empty metrics, nothing to store
+        }
+    }
+
+    /// Create a PushMetricExporter implementation for use with OpenTelemetry SDK
+    ///
+    /// This method returns a `PushMetricExporter` that exports metrics via this `OtlpLibrary`
+    /// instance. The exporter can be used directly with OpenTelemetry SDK's `PeriodicReader`
+    /// or `ManualReader`.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `PushMetricExporter` implementation that delegates to this library instance.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use otlp_arrow_library::OtlpLibrary;
+    /// use opentelemetry_sdk::metrics::PeriodicReader;
+    ///
+    /// # async fn example(library: OtlpLibrary) -> Result<(), Box<dyn std::error::Error>> {
+    /// let metric_exporter = library.metric_exporter();
+    /// let reader = PeriodicReader::builder(metric_exporter)
+    ///     .with_interval(std::time::Duration::from_secs(10))
+    ///     .build();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn metric_exporter(&self) -> crate::otlp::OtlpMetricExporter {
+        crate::otlp::OtlpMetricExporter::new(Arc::new(self.clone()))
+    }
+
+    /// Create a SpanExporter implementation for use with OpenTelemetry SDK
+    ///
+    /// This method returns a `SpanExporter` that exports spans via this `OtlpLibrary`
+    /// instance. The exporter can be used directly with OpenTelemetry SDK's `TracerProvider`.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `SpanExporter` implementation that delegates to this library instance.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use otlp_arrow_library::OtlpLibrary;
+    /// use opentelemetry_sdk::trace::SdkTracerProvider;
+    ///
+    /// # async fn example(library: OtlpLibrary) -> Result<(), Box<dyn std::error::Error>> {
+    /// let span_exporter = library.span_exporter();
+    /// let provider = SdkTracerProvider::builder()
+    ///     .with_batch_exporter(span_exporter)
+    ///     .build();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn span_exporter(&self) -> crate::otlp::OtlpSpanExporter {
+        crate::otlp::OtlpSpanExporter::new(Arc::new(self.clone()))
     }
 
     /// Force immediate flush of all buffered messages to disk

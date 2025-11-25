@@ -1,111 +1,24 @@
-name: Code Coverage
+# This workflow has been moved to ci.yml as a job that depends on test-linux
+# to optimize cache reuse and ensure tests pass before coverage runs.
+# This file is kept for reference but is no longer used.
+# 
+# The coverage job is now part of the main CI workflow and:
+# - Depends on test-linux passing
+# - Reuses the build cache from test-linux for faster execution
+# - Runs only after tests succeed, avoiding wasted CI time
+
+name: Code Coverage (DEPRECATED - moved to ci.yml)
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
-  schedule:
-    # Run weekly on Monday
-    - cron: '0 0 * * 1'
-
-env:
-  CARGO_TERM_COLOR: always
+  workflow_dispatch:  # Only allow manual runs for reference
 
 jobs:
-  coverage:
-    name: Code Coverage Validation (85% per file)
+  deprecated:
+    name: This workflow is deprecated
     runs-on: ubuntu-latest
-    
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Install dependencies
+      - name: Notice
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bc
-          cargo install cargo-tarpaulin
-      
-      - name: Run tests with coverage
-        run: |
-          cargo tarpaulin \
-            --workspace \
-            --all-features \
-            --timeout 120 \
-            --out Xml \
-            --out Stdout \
-            --exclude-files 'tests/*' \
-            --exclude-files 'examples/*' \
-            --exclude-files 'benches/*' \
-            --exclude-files 'src/bin/*' \
-            --exclude-files 'src/python/*' \
-            --exclude-files 'target/*' \
-            --exclude-files '**/main.rs' \
-            --exclude-files '**/lib.rs' || true
-      
-      - name: Generate coverage report
-        run: |
-          if [ -f "scripts/check_coverage.sh" ]; then
-            bash scripts/check_coverage.sh
-          else
-            echo "Coverage check script not found, using inline check"
-            cargo tarpaulin \
-              --workspace \
-              --all-features \
-              --timeout 120 \
-              --out Stdout \
-              --exclude-files 'tests/*' \
-              --exclude-files 'examples/*' \
-              --exclude-files 'benches/*' \
-              --exclude-files 'src/bin/*' \
-              --exclude-files 'src/python/*' \
-              --exclude-files 'target/*' \
-              --exclude-files '**/main.rs' \
-              --exclude-files '**/lib.rs' | \
-            grep -E "^\s+[0-9]+\.[0-9]+%" | \
-            awk '{print $2, $1}' | \
-            while read coverage file; do
-              coverage_num=$(echo $coverage | sed 's/%//')
-              if (( $(echo "$coverage_num < 85" | bc -l) )); then
-                echo "❌ ERROR: $file has coverage $coverage (below 85% requirement)"
-                exit 1
-              else
-                echo "✓ $file: $coverage"
-              fi
-            done
-          fi
-      
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./cobertura.xml
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: unittests
-          name: codecov-umbrella
-      
-      - name: Coverage Summary
-        run: |
-          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All source files must have at least 85% coverage." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          cargo tarpaulin \
-            --workspace \
-            --all-features \
-            --timeout 120 \
-            --out Stdout \
-            --exclude-files 'tests/*' \
-            --exclude-files 'examples/*' \
-            --exclude-files 'benches/*' \
-            --exclude-files 'src/bin/*' \
-            --exclude-files 'src/python/*' \
-            --exclude-files 'target/*' \
-            --exclude-files '**/main.rs' \
-            --exclude-files '**/lib.rs' | \
-          grep -E "^\s+[0-9]+\.[0-9]+%" | \
-          awk '{printf "| %s | %s |\n", $2, $1}' >> $GITHUB_STEP_SUMMARY || true
-
+          echo "This workflow has been moved to ci.yml"
+          echo "Coverage now runs as part of the main CI pipeline"
+          exit 1
