@@ -7,6 +7,11 @@ description = "Cross-platform Rust library for receiving OTLP messages via gRPC 
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/your-org/otlp-rust-service"
 
+[features]
+# Python extension module feature - enables Python bindings compilation
+# Maturin will enable this when building Python wheels
+python-extension = []
+
 [dependencies]
 # OpenTelemetry
 opentelemetry = "0.31"
@@ -60,6 +65,7 @@ pyo3 = { version = "0.20", features = ["auto-initialize", "extension-module"] }
 [lib]
 name = "otlp_arrow_library"
 path = "src/lib.rs"
+# Need cdylib for Python extension module, rlib for Rust library usage
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]

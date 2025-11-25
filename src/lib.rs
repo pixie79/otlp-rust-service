@@ -37,6 +37,9 @@ pub mod error;
 pub mod mock;
 pub mod otlp;
 
+// Python module - only compiled when python-extension feature is enabled
+// This prevents linker errors during cargo test when Python isn't available
+#[cfg(feature = "python-extension")]
 pub mod python;
 
 // Re-export public API
@@ -50,6 +53,8 @@ pub use otlp::{OtlpMetricExporter, OtlpSpanExporter};
 
 // Re-export Python module function for maturin to find
 // This makes the #[pymodule] function accessible at crate root level
+// Only available when python-extension feature is enabled
+#[cfg(feature = "python-extension")]
 pub use python::otlp_arrow_library;
 
 // Initialize tracing subscriber for structured logging
