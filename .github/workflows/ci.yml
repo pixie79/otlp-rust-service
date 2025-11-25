@@ -90,8 +90,8 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           maturin develop --release
-          # Verify module is installed
-          python3 -c "import otlp_arrow_library; print('Module installed successfully')"
+          # Verify module is installed (use venv Python)
+          .venv/bin/python -c "import otlp_arrow_library; print('Module installed successfully')"
       
       - name: Run Python tests
         run: |
@@ -153,8 +153,8 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           maturin develop --release
-          # Verify module is installed
-          python3 -c "import otlp_arrow_library; print('Module installed successfully')"
+          # Verify module is installed (use venv Python)
+          .venv/bin/python -c "import otlp_arrow_library; print('Module installed successfully')"
       
       - name: Run Python tests
         run: |
