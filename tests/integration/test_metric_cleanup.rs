@@ -76,9 +76,10 @@ async fn test_default_metric_cleanup_interval() {
     // Create library instance
     let library = OtlpLibrary::new(config).await.unwrap();
     
-    // Export metrics (using default ResourceMetrics)
-    let metrics = ResourceMetrics::default();
-    library.export_metrics_arrow(&metrics).await.unwrap();
+    // Export metrics (using Protobuf)
+    use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+    let metrics_request = ExportMetricsServiceRequest::default();
+    library.export_metrics(metrics_request).await.unwrap();
     
     // Flush to ensure write
     library.flush().await.unwrap();

@@ -7,10 +7,12 @@ use std::sync::Mutex;
 static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 fn clear_dashboard_env_vars() {
-    env::remove_var("OTLP_DASHBOARD_ENABLED");
-    env::remove_var("OTLP_DASHBOARD_PORT");
-    env::remove_var("OTLP_DASHBOARD_STATIC_DIR");
-    env::remove_var("OTLP_DASHBOARD_BIND_ADDRESS");
+    unsafe {
+        env::remove_var("OTLP_DASHBOARD_ENABLED");
+        env::remove_var("OTLP_DASHBOARD_PORT");
+        env::remove_var("OTLP_DASHBOARD_STATIC_DIR");
+        env::remove_var("OTLP_DASHBOARD_BIND_ADDRESS");
+    }
 }
 
 #[test]
@@ -18,7 +20,9 @@ fn test_dashboard_config_from_env_disabled() {
     let _guard = ENV_MUTEX.lock().unwrap();
     clear_dashboard_env_vars();
 
-    env::set_var("OTLP_DASHBOARD_ENABLED", "false");
+    unsafe {
+        env::set_var("OTLP_DASHBOARD_ENABLED", "false");
+    }
 
     let config = ConfigLoader::from_env().unwrap();
 
@@ -37,9 +41,11 @@ fn test_dashboard_config_from_env_enabled() {
     let static_dir = temp_dir.path().join("dashboard").join("dist");
     std::fs::create_dir_all(&static_dir).unwrap();
 
-    env::set_var("OTLP_DASHBOARD_ENABLED", "true");
-    env::set_var("OTLP_DASHBOARD_PORT", "9000");
-    env::set_var("OTLP_DASHBOARD_STATIC_DIR", static_dir.to_str().unwrap());
+    unsafe {
+        env::set_var("OTLP_DASHBOARD_ENABLED", "true");
+        env::set_var("OTLP_DASHBOARD_PORT", "9000");
+        env::set_var("OTLP_DASHBOARD_STATIC_DIR", static_dir.to_str().unwrap());
+    }
 
     let config = ConfigLoader::from_env().unwrap();
 
@@ -77,8 +83,10 @@ fn test_dashboard_config_from_env_partial() {
     let static_dir = temp_dir.path().join("dashboard").join("dist");
     std::fs::create_dir_all(&static_dir).unwrap();
 
-    env::set_var("OTLP_DASHBOARD_ENABLED", "true");
-    env::set_var("OTLP_DASHBOARD_STATIC_DIR", static_dir.to_str().unwrap());
+    unsafe {
+        env::set_var("OTLP_DASHBOARD_ENABLED", "true");
+        env::set_var("OTLP_DASHBOARD_STATIC_DIR", static_dir.to_str().unwrap());
+    }
 
     let config = ConfigLoader::from_env().unwrap();
 
@@ -109,9 +117,11 @@ dashboard:
     let temp_file = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(temp_file.path(), yaml).unwrap();
 
-    env::set_var("OTLP_DASHBOARD_ENABLED", "true");
-    env::set_var("OTLP_DASHBOARD_PORT", "9000");
-    env::set_var("OTLP_DASHBOARD_STATIC_DIR", static_dir.to_str().unwrap());
+    unsafe {
+        env::set_var("OTLP_DASHBOARD_ENABLED", "true");
+        env::set_var("OTLP_DASHBOARD_PORT", "9000");
+        env::set_var("OTLP_DASHBOARD_STATIC_DIR", static_dir.to_str().unwrap());
+    }
 
     let config = ConfigLoader::from_yaml(temp_file.path()).unwrap();
 

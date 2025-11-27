@@ -355,13 +355,13 @@ impl FlightService for MockFlightServiceImpl {
             // Convert batches to spans/metrics and store in mock state
             for batch in batches {
                 // Try to convert to traces
-                if let Ok(spans) = crate::otlp::server_arrow::convert_arrow_batch_to_spans(&batch) {
-                    if !spans.is_empty() {
-                        let mut state = state.write().await;
-                        state.received_traces.extend(spans);
-                        state.grpc_calls += 1;
-                        continue;
-                    }
+                if let Ok(spans) = crate::otlp::server_arrow::convert_arrow_batch_to_spans(&batch)
+                    && !spans.is_empty()
+                {
+                    let mut state = state.write().await;
+                    state.received_traces.extend(spans);
+                    state.grpc_calls += 1;
+                    continue;
                 }
 
                 // Try to convert to metrics

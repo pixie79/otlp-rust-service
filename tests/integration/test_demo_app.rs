@@ -142,9 +142,10 @@ async fn test_data_generation() {
     
     let library = OtlpLibrary::new(config).await.unwrap();
     
-    // Export metrics using export_metrics_arrow
-    let metrics = ResourceMetrics::default();
-    library.export_metrics_arrow(&metrics).await.unwrap();
+    // Export metrics using export_metrics (Protobuf)
+    use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+    let metrics_request = ExportMetricsServiceRequest::default();
+    library.export_metrics(metrics_request).await.unwrap();
     
     // Export spans
     let trace_id = TraceId::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
@@ -385,8 +386,9 @@ async fn test_continuous_generation() {
             let count = counter_clone.fetch_add(1, Ordering::Relaxed);
             
             // Generate metrics
-            let metrics = ResourceMetrics::default();
-            let _ = library_clone.export_metrics_arrow(&metrics).await;
+            use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+            let metrics_request = ExportMetricsServiceRequest::default();
+            let _ = library_clone.export_metrics(metrics_request).await;
             
             // Verify counter is incrementing (demonstrates time-series pattern)
             assert!(count < 10, "Counter should increment");
@@ -419,8 +421,9 @@ async fn test_graceful_shutdown() {
     let library = OtlpLibrary::new(config).await.unwrap();
     
     // Export some data
-    let metrics = opentelemetry_sdk::metrics::data::ResourceMetrics::default();
-    library.export_metrics_arrow(&metrics).await.unwrap();
+    use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+    let metrics_request = ExportMetricsServiceRequest::default();
+    library.export_metrics(metrics_request).await.unwrap();
     
     // Flush before shutdown (graceful shutdown pattern)
     library.flush().await.expect("Flush should succeed");

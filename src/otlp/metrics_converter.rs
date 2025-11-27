@@ -29,7 +29,7 @@ impl InternalResourceMetrics {
                 .resource
                 .attributes
                 .iter()
-                .map(|kv| sdk_key_value_to_proto(kv))
+                .map(sdk_key_value_to_proto)
                 .collect(),
             dropped_attributes_count: self.resource.dropped_attributes_count,
             entity_refs: vec![], // Entity refs not used in SDK 0.31
@@ -46,7 +46,7 @@ impl InternalResourceMetrics {
                         .scope
                         .attributes
                         .iter()
-                        .map(|kv| sdk_key_value_to_proto(kv))
+                        .map(sdk_key_value_to_proto)
                         .collect(),
                     dropped_attributes_count: sm.scope.dropped_attributes_count,
                 });
@@ -54,7 +54,7 @@ impl InternalResourceMetrics {
                 let metrics = sm
                     .metrics
                     .iter()
-                    .filter_map(|m| internal_metric_to_proto(m))
+                    .filter_map(internal_metric_to_proto)
                     .collect();
 
                 ProtoScopeMetrics {
@@ -193,7 +193,7 @@ impl InternalResourceMetrics {
                     InternalMetricData::Histogram(hist) => {
                         for dp in &hist.data_points {
                             // For histograms, we'll use the sum if available, or count
-                            let value = dp.sum.unwrap_or_else(|| dp.count as f64);
+                            let value = dp.sum.unwrap_or(dp.count as f64);
 
                             metric_names.push(Some(metric.name.clone()));
                             values.push(value);
@@ -304,7 +304,7 @@ fn internal_metric_to_proto(metric: &InternalMetric) -> Option<Metric> {
             let data_points = gauge
                 .data_points
                 .iter()
-                .filter_map(|dp| internal_number_data_point_to_proto(dp))
+                .filter_map(internal_number_data_point_to_proto)
                 .collect();
             Some(
                 opentelemetry_proto::tonic::metrics::v1::metric::Data::Gauge(Gauge { data_points }),
@@ -314,7 +314,7 @@ fn internal_metric_to_proto(metric: &InternalMetric) -> Option<Metric> {
             let data_points = sum
                 .data_points
                 .iter()
-                .filter_map(|dp| internal_number_data_point_to_proto(dp))
+                .filter_map(internal_number_data_point_to_proto)
                 .collect();
             Some(opentelemetry_proto::tonic::metrics::v1::metric::Data::Sum(
                 Sum {
@@ -328,7 +328,7 @@ fn internal_metric_to_proto(metric: &InternalMetric) -> Option<Metric> {
             let data_points = hist
                 .data_points
                 .iter()
-                .filter_map(|dp| internal_histogram_data_point_to_proto(dp))
+                .filter_map(internal_histogram_data_point_to_proto)
                 .collect();
             Some(
                 opentelemetry_proto::tonic::metrics::v1::metric::Data::Histogram(Histogram {
@@ -360,11 +360,7 @@ fn internal_number_data_point_to_proto(
     }?;
 
     Some(ProtoNumberDataPoint {
-        attributes: dp
-            .attributes
-            .iter()
-            .map(|kv| sdk_key_value_to_proto(kv))
-            .collect(),
+        attributes: dp.attributes.iter().map(sdk_key_value_to_proto).collect(),
         start_time_unix_nano: dp.start_time_unix_nano.unwrap_or(0),
         time_unix_nano: dp.time_unix_nano,
         value: Some(value),
@@ -378,11 +374,7 @@ fn internal_histogram_data_point_to_proto(
     dp: &InternalHistogramDataPoint,
 ) -> Option<ProtoHistogramDataPoint> {
     Some(ProtoHistogramDataPoint {
-        attributes: dp
-            .attributes
-            .iter()
-            .map(|kv| sdk_key_value_to_proto(kv))
-            .collect(),
+        attributes: dp.attributes.iter().map(sdk_key_value_to_proto).collect(),
         start_time_unix_nano: dp.start_time_unix_nano.unwrap_or(0),
         time_unix_nano: dp.time_unix_nano,
         count: dp.count,

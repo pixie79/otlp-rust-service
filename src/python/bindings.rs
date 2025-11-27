@@ -3,6 +3,7 @@
 //! Provides Python bindings for the OtlpLibrary struct and related types.
 
 #![allow(non_local_definitions)]
+#![allow(unsafe_op_in_unsafe_fn)] // PyO3 generates unsafe code that is safe in this context
 
 use crate::api::public::OtlpLibrary;
 use crate::config::{Config, ConfigBuilder};

@@ -150,7 +150,7 @@ pub fn extract_from_protobuf(
             attributes: proto_resource
                 .attributes
                 .iter()
-                .filter_map(|kv| proto_key_value_to_sdk(kv))
+                .filter_map(proto_key_value_to_sdk)
                 .collect(),
             dropped_attributes_count: proto_resource.dropped_attributes_count,
         }
@@ -177,7 +177,7 @@ pub fn extract_from_protobuf(
                     attributes: proto_scope
                         .attributes
                         .iter()
-                        .filter_map(|kv| proto_key_value_to_sdk(kv))
+                        .filter_map(proto_key_value_to_sdk)
                         .collect(),
                     dropped_attributes_count: proto_scope.dropped_attributes_count,
                 }
@@ -193,7 +193,7 @@ pub fn extract_from_protobuf(
             let metrics = proto_sm
                 .metrics
                 .iter()
-                .filter_map(|proto_metric| proto_metric_to_internal(proto_metric))
+                .filter_map(proto_metric_to_internal)
                 .collect();
 
             InternalScopeMetrics {
@@ -249,7 +249,7 @@ fn proto_metric_to_internal(proto_metric: &Metric) -> Option<InternalMetric> {
             let data_points = gauge
                 .data_points
                 .iter()
-                .filter_map(|dp| proto_number_data_point_to_internal(dp))
+                .filter_map(proto_number_data_point_to_internal)
                 .collect();
             InternalMetricData::Gauge(InternalGauge { data_points })
         }
@@ -257,7 +257,7 @@ fn proto_metric_to_internal(proto_metric: &Metric) -> Option<InternalMetric> {
             let data_points = sum
                 .data_points
                 .iter()
-                .filter_map(|dp| proto_number_data_point_to_internal(dp))
+                .filter_map(proto_number_data_point_to_internal)
                 .collect();
             InternalMetricData::Sum(InternalSum {
                 data_points,
@@ -269,7 +269,7 @@ fn proto_metric_to_internal(proto_metric: &Metric) -> Option<InternalMetric> {
             let data_points = hist
                 .data_points
                 .iter()
-                .filter_map(|dp| proto_histogram_data_point_to_internal(dp))
+                .filter_map(proto_histogram_data_point_to_internal)
                 .collect();
             InternalMetricData::Histogram(InternalHistogram {
                 data_points,
@@ -312,7 +312,7 @@ fn proto_number_data_point_to_internal(
         attributes: dp
             .attributes
             .iter()
-            .filter_map(|kv| proto_key_value_to_sdk(kv))
+            .filter_map(proto_key_value_to_sdk)
             .collect(),
         start_time_unix_nano: if dp.start_time_unix_nano == 0 {
             None
@@ -332,7 +332,7 @@ fn proto_histogram_data_point_to_internal(
         attributes: dp
             .attributes
             .iter()
-            .filter_map(|kv| proto_key_value_to_sdk(kv))
+            .filter_map(proto_key_value_to_sdk)
             .collect(),
         start_time_unix_nano: if dp.start_time_unix_nano == 0 {
             None

@@ -127,10 +127,10 @@ impl OtlpLibrary {
                 if batch_buffer_clone.should_write().await {
                     // Take buffered traces
                     let traces = batch_buffer_clone.take_traces().await;
-                    if !traces.is_empty() {
-                        if let Err(e) = file_exporter_clone.export_traces(traces).await {
-                            warn!("Failed to export traces: {}", e);
-                        }
+                    if !traces.is_empty()
+                        && let Err(e) = file_exporter_clone.export_traces(traces).await
+                    {
+                        warn!("Failed to export traces: {}", e);
                     }
 
                     // Take buffered metrics (in protobuf format) and export directly

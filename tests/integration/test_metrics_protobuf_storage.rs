@@ -55,10 +55,10 @@ async fn test_metrics_protobuf_storage_and_export() {
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();
 
-    // Export metrics using export_metrics_arrow (converts ResourceMetrics to Arrow directly)
-    let metrics = SdkResourceMetrics::default();
+    // Export metrics using export_metrics (Protobuf)
+    let metrics_request = create_test_protobuf_metrics_request();
     library
-        .export_metrics_arrow(&metrics)
+        .export_metrics(metrics_request)
         .await
         .expect("Failed to export metrics");
 
@@ -108,9 +108,9 @@ async fn test_metrics_protobuf_storage_multiple_exports() {
 
     // Export multiple metrics (each will be converted to Arrow and stored)
     for i in 0..5 {
-        let metrics = SdkResourceMetrics::default();
+        let metrics_request = create_test_protobuf_metrics_request();
         library
-            .export_metrics_arrow(&metrics)
+            .export_metrics(metrics_request)
             .await
             .expect(&format!("Failed to export metric {}", i));
     }
@@ -154,10 +154,10 @@ async fn test_metrics_protobuf_storage_flush_behavior() {
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();
 
-    // Export metrics using export_metrics_arrow
-    let metrics = SdkResourceMetrics::default();
+    // Export metrics using export_metrics (Protobuf)
+    let metrics_request = create_test_protobuf_metrics_request();
     library
-        .export_metrics_arrow(&metrics)
+        .export_metrics(metrics_request)
         .await
         .expect("Failed to export metrics");
 
