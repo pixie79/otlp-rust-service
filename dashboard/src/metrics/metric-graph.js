@@ -135,14 +135,18 @@ export class MetricGraph {
 
         if (pointsToAdd > 0) {
           const newPoints = filtered.slice(-pointsToAdd);
-          const x = newPoints.map((m) => {
-            const date = new Date(m.timestamp / 1_000_000);
-            return isNaN(date.getTime()) ? null : date;
-          }).filter(d => d !== null);
-          const y = newPoints.map((m) => {
-            const val = Number(m.value);
-            return isNaN(val) ? null : val;
-          }).filter(v => v !== null);
+          const x = newPoints
+            .map((m) => {
+              const date = new Date(m.timestamp / 1_000_000);
+              return isNaN(date.getTime()) ? null : date;
+            })
+            .filter((d) => d !== null);
+          const y = newPoints
+            .map((m) => {
+              const val = Number(m.value);
+              return isNaN(val) ? null : val;
+            })
+            .filter((v) => v !== null);
 
           // Only add if we have valid data
           if (x.length > 0 && y.length > 0 && x.length === y.length) {
@@ -212,7 +216,8 @@ export class MetricGraph {
       if (this.data.size === 0) {
         // Show empty state
         Plotly.purge(this.container);
-        this.container.innerHTML = '<div class="metric-graph__empty"><p>No data available</p></div>';
+        this.container.innerHTML =
+          '<div class="metric-graph__empty"><p>No data available</p></div>';
         this.isRendered = false;
         return;
       }
@@ -236,16 +241,20 @@ export class MetricGraph {
 
         if (filtered.length === 0) continue;
 
-        const x = filtered.map((m) => {
-          const date = new Date(m.timestamp / 1_000_000);
-          return isNaN(date.getTime()) ? null : date;
-        }).filter(d => d !== null);
-        
-        const y = filtered.map((m) => {
-          const val = Number(m.value);
-          return isNaN(val) ? null : val;
-        }).filter(v => v !== null);
-        
+        const x = filtered
+          .map((m) => {
+            const date = new Date(m.timestamp / 1_000_000);
+            return isNaN(date.getTime()) ? null : date;
+          })
+          .filter((d) => d !== null);
+
+        const y = filtered
+          .map((m) => {
+            const val = Number(m.value);
+            return isNaN(val) ? null : val;
+          })
+          .filter((v) => v !== null);
+
         const text = filtered.map((m) => this._formatTooltip(m));
 
         // Only add trace if we have valid data with matching lengths
@@ -267,7 +276,8 @@ export class MetricGraph {
       // If no valid traces, show empty state
       if (traces.length === 0) {
         Plotly.purge(this.container);
-        this.container.innerHTML = '<div class="metric-graph__empty"><p>No valid data available</p></div>';
+        this.container.innerHTML =
+          '<div class="metric-graph__empty"><p>No valid data available</p></div>';
         this.isRendered = false;
         return;
       }
@@ -284,24 +294,28 @@ export class MetricGraph {
         },
       };
 
-      Plotly.react(this.container, traces, layout, this.plotlyConfig).then(() => {
-        // Store trace indices for extendTraces
-        this.traceIndices.clear();
-        traces.forEach((trace, index) => {
-          this.traceIndices.set(trace.name, index);
+      Plotly.react(this.container, traces, layout, this.plotlyConfig)
+        .then(() => {
+          // Store trace indices for extendTraces
+          this.traceIndices.clear();
+          traces.forEach((trace, index) => {
+            this.traceIndices.set(trace.name, index);
+          });
+          this.isRendered = true;
+        })
+        .catch((error) => {
+          console.error('[MetricGraph] Plotly.react error:', error);
+          this.isRendered = false;
+          // Show error state
+          this.container.innerHTML =
+            '<div class="metric-graph__empty"><p>Error rendering graph</p></div>';
         });
-        this.isRendered = true;
-      }).catch((error) => {
-        console.error('[MetricGraph] Plotly.react error:', error);
-        this.isRendered = false;
-        // Show error state
-        this.container.innerHTML = '<div class="metric-graph__empty"><p>Error rendering graph</p></div>';
-      });
     } catch (error) {
       console.error('[MetricGraph] Error in _render:', error);
       this.isRendered = false;
       // Show error state
-      this.container.innerHTML = '<div class="metric-graph__empty"><p>Error rendering graph</p></div>';
+      this.container.innerHTML =
+        '<div class="metric-graph__empty"><p>Error rendering graph</p></div>';
     }
   }
 

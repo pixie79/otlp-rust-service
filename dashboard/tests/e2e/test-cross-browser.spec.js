@@ -107,8 +107,8 @@ for (const browser of browsers) {
       await page.waitForTimeout(3000);
 
       // Check that there are no DuckDB initialization errors
-      const duckdbErrors = errors.filter((e) =>
-        e.includes('DuckDB') || e.includes('WebAssembly') || e.includes('WASM')
+      const duckdbErrors = errors.filter(
+        (e) => e.includes('DuckDB') || e.includes('WebAssembly') || e.includes('WASM')
       );
 
       expect(duckdbErrors).toHaveLength(0);

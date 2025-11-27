@@ -59,14 +59,16 @@ export class FileReaderComponent {
       const chunkSize = options.chunkSize || 10 * 1024 * 1024; // 10MB chunks
       const maxSize = options.maxSize || 200 * 1024 * 1024; // 200MB max
       const fileName = fileNameOverride ?? fileReference.name ?? 'unknown';
-      
+
       // If this is a FileHandle (File System Access API), get a fresh file instance
       // to ensure we read the latest data
       if (typeof fileReference.getFile === 'function') {
         const freshFile = await fileReference.getFile();
         // Use the fresh file's size to ensure we read all current data
         if (freshFile.size !== file.size) {
-          console.log(`[FileReader] File size changed: ${file.size} -> ${freshFile.size}, reading fresh data`);
+          console.log(
+            `[FileReader] File size changed: ${file.size} -> ${freshFile.size}, reading fresh data`
+          );
         }
       }
 

@@ -69,11 +69,12 @@ export class SQLTerminal {
     const input = this.container.querySelector('#sql-terminal-input');
     const executeBtn = this.container.querySelector('#sql-terminal-execute');
     const clearBtn = this.container.querySelector('#sql-terminal-clear');
-    const historyBtn = this.container.querySelector('#sql-terminal-history');
+    // History button is reserved for future use
+    // const historyBtn = this.container.querySelector('#sql-terminal-history');
 
     // Execute query
     executeBtn.addEventListener('click', () => this._executeQuery());
-    
+
     // Clear input
     clearBtn.addEventListener('click', () => {
       input.value = '';
@@ -91,8 +92,7 @@ export class SQLTerminal {
       else if (e.key === 'ArrowUp' && e.ctrlKey) {
         e.preventDefault();
         this._navigateHistory(-1);
-      }
-      else if (e.key === 'ArrowDown' && e.ctrlKey) {
+      } else if (e.key === 'ArrowDown' && e.ctrlKey) {
         e.preventDefault();
         this._navigateHistory(1);
       }
@@ -173,9 +173,9 @@ export class SQLTerminal {
   /**
    * Display query results as a table
    */
-  _displayTable(rows, duration) {
+  _displayTable(rows, _duration) {
     const outputEl = this.container.querySelector('#sql-terminal-output');
-    
+
     if (rows.length === 0) {
       outputEl.innerHTML = '<div class="sql-terminal__empty">No results</div>';
       return;
@@ -183,27 +183,26 @@ export class SQLTerminal {
 
     // Get column names from first row
     const columns = Object.keys(rows[0]);
-    
+
     // Build table HTML
     let html = '<div class="sql-terminal__table-container">';
     html += '<table class="sql-terminal__table">';
-    
+
     // Header
     html += '<thead><tr>';
     for (const col of columns) {
       html += `<th>${this._escapeHtml(col)}</th>`;
     }
     html += '</tr></thead>';
-    
+
     // Body
     html += '<tbody>';
     for (const row of rows) {
       html += '<tr>';
       for (const col of columns) {
         const value = row[col];
-        const displayValue = value === null || value === undefined 
-          ? '<em>NULL</em>' 
-          : this._escapeHtml(String(value));
+        const displayValue =
+          value === null || value === undefined ? '<em>NULL</em>' : this._escapeHtml(String(value));
         html += `<td>${displayValue}</td>`;
       }
       html += '</tr>';
@@ -232,7 +231,7 @@ export class SQLTerminal {
       );
 
       if (result.rows && result.rows.length > 0) {
-        const tableNames = result.rows.map(row => row.table_name);
+        const tableNames = result.rows.map((row) => row.table_name);
         tablesEl.textContent = tableNames.join(', ') || 'None';
       } else {
         tablesEl.textContent = 'None (load data first)';
@@ -255,7 +254,7 @@ export class SQLTerminal {
    */
   _addToHistory(sql) {
     // Remove if already exists
-    this.queryHistory = this.queryHistory.filter(q => q !== sql);
+    this.queryHistory = this.queryHistory.filter((q) => q !== sql);
     // Add to front
     this.queryHistory.unshift(sql);
     // Keep only last 50
@@ -275,14 +274,14 @@ export class SQLTerminal {
     }
 
     const input = this.container.querySelector('#sql-terminal-input');
-    
+
     if (this.historyIndex === -1) {
       // Save current query as "current"
       this.currentQuery = input.value;
     }
 
     this.historyIndex += direction;
-    
+
     if (this.historyIndex < 0) {
       this.historyIndex = -1;
       input.value = this.currentQuery || '';
@@ -332,4 +331,3 @@ export class SQLTerminal {
     this._updateTableList();
   }
 }
-

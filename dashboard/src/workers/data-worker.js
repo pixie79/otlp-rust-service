@@ -29,7 +29,7 @@ const handlers = {
       throw new Error('DuckDBClient is not initialized. Call INIT first.');
     }
     const { fileName, fileURL, buffer } = payload;
-    
+
     // Support both fileURL (for server-served files) and buffer (for local files)
     if (buffer) {
       // Local file - use buffer directly

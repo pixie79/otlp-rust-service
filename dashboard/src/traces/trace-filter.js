@@ -70,7 +70,7 @@ export class TraceFilter {
     this.form.addEventListener('submit', (event) => event.preventDefault());
     this.form.addEventListener('input', () => this._handleChange());
     this.form.addEventListener('change', () => this._handleChange());
-    
+
     // Handle live tail toggle separately
     const liveTailToggle = this.container.querySelector('#live-tail-toggle');
     if (liveTailToggle) {

@@ -48,8 +48,8 @@ export class TraceQuery {
 
     // Filter to only traces tables (tables starting with otlp_traces_)
     // Metrics tables don't have start_time_unix_nano column
-    const tracesTables = tables.filter(tableName => 
-      tableName.startsWith('otlp_traces_') || tableName.includes('traces')
+    const tracesTables = tables.filter(
+      (tableName) => tableName.startsWith('otlp_traces_') || tableName.includes('traces')
     );
 
     if (!tracesTables.length) {
@@ -69,15 +69,16 @@ export class TraceQuery {
       return this.executor.execute(sql, [...params]).catch((error) => {
         // Handle missing tables gracefully (e.g., evicted tables, not yet created)
         // Check if it's a "table does not exist" error
-        const isTableNotFound = error.message && (
-          error.message.includes('does not exist') ||
-          error.message.includes('Catalog Error')
-        );
-        
+        const isTableNotFound =
+          error.message &&
+          (error.message.includes('does not exist') || error.message.includes('Catalog Error'));
+
         if (isTableNotFound) {
           // Table doesn't exist - likely not ingested yet or was evicted
           // Return empty result and mark for cleanup
-          console.warn(`Query failed for table ${tableName}: Table does not exist (may not be ingested yet or was evicted)`);
+          console.warn(
+            `Query failed for table ${tableName}: Table does not exist (may not be ingested yet or was evicted)`
+          );
           return { rows: [], error: error.message, tableName, isTableNotFound: true };
         } else {
           // Other error - log but don't mark for cleanup
@@ -108,13 +109,13 @@ export class TraceQuery {
       })
       .map((result) => result.value)
       .flatMap((result) => result.rows ?? []);
-    
+
     // Return failed table names so caller can clean up state
     // Only clean up tables that actually don't exist (not other errors)
     if (failedTables.length > 0 && this.onTableMissing) {
       this.onTableMissing(failedTables);
     }
-    
+
     const traces = rows.map(createTraceEntry).sort(sortByStartTimeDesc);
     return traces.slice(0, limit);
   }

@@ -16,7 +16,6 @@ import { Search } from './ui/search.js';
 import { TimeRangeSelector } from './ui/time-range-selector.js';
 import { Settings } from './ui/settings.js';
 import { SQLTerminal } from './ui/sql-terminal.js';
-import { QueryExecutor } from './duckdb/query-executor.js';
 
 // Status badge helper function (currently unused, kept for potential future use)
 // const statusBadge = (text) => `<span class="status-badge">${text}</span>`;
@@ -123,7 +122,7 @@ export class App {
     this._instantiateSQLTerminal();
 
     await this.workerClient.init();
-    
+
     // Clear state on initialization to ensure clean state after page refresh/restart
     this.state.tables.clear();
     if (this.fileWatcher) {
@@ -131,7 +130,7 @@ export class App {
       // Clear known files to force re-detection
       this.fileWatcher.knownFiles?.clear();
     }
-    
+
     this.traceQuery = new TraceQuery({
       execute: async (sql, params) => {
         const result = await this.workerClient.query(sql, params);
@@ -198,11 +197,11 @@ export class App {
     this.fileWatcher.onFileChanged = async (fileHandle, metadata) => {
       const fileName = metadata?.name ?? fileHandle.name ?? 'unknown';
       this._log(`Detected modified file: ${fileName} (size: ${metadata?.size ?? 'unknown'} bytes)`);
-      
+
       // Small delay to ensure file write is complete before reading
       // This is especially important for streaming Arrow files that are being actively written to
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       await this._ingestFile(fileHandle, metadata);
     };
   }
@@ -234,11 +233,11 @@ export class App {
     try {
       this._setStatus('Awaiting permission…');
       const directory = await this.fileReader.selectDirectory();
-      
+
       // Clear all tables and state when selecting a new directory
       // This ensures a fresh start when switching directories
       this._log('Clearing existing data...');
-      
+
       // Only clear tables if DuckDB is initialized
       // If not initialized yet, just clear local state
       try {
@@ -251,13 +250,13 @@ export class App {
           throw clearError;
         }
       }
-      
+
       this.state.tables.clear();
       if (this.fileWatcher) {
         this.fileWatcher.clearCache();
       }
       this._log('Data cleared. Starting fresh...');
-      
+
       this.state.directory = directory;
       this._setStatus('Watching for updates');
       this._log('Directory access granted. Starting watcher…');
@@ -273,7 +272,7 @@ export class App {
   async _ingestFile(fileHandle, metadata) {
     try {
       const name = metadata?.name ?? fileHandle.name ?? 'unknown.arrows';
-      
+
       // Check if this file is already registered (might be an update)
       const existingTableName = this.state.tables.get(name);
       const isUpdate = existingTableName !== undefined;
@@ -286,16 +285,22 @@ export class App {
         chunkSize: 10 * 1024 * 1024, // 10MB chunks
         maxSize: 200 * 1024 * 1024, // 200MB max
       });
-      
-      console.log(`[App] Ingesting ${isUpdate ? 'updated' : 'new'} file: ${name}, size: ${buffer.byteLength} bytes`);
-      
+
+      console.log(
+        `[App] Ingesting ${isUpdate ? 'updated' : 'new'} file: ${name}, size: ${buffer.byteLength} bytes`
+      );
+
       const { tableName } = await this.workerClient.registerFile(name, buffer);
       this.state.tables.set(name, tableName);
-      
+
       if (isUpdate) {
-        this._log(`Updated ${name} as ${tableName} in DuckDB (${(buffer.byteLength / 1024).toFixed(2)} KB).`);
+        this._log(
+          `Updated ${name} as ${tableName} in DuckDB (${(buffer.byteLength / 1024).toFixed(2)} KB).`
+        );
       } else {
-        this._log(`Registered ${name} as ${tableName} in DuckDB (${(buffer.byteLength / 1024).toFixed(2)} KB).`);
+        this._log(
+          `Registered ${name} as ${tableName} in DuckDB (${(buffer.byteLength / 1024).toFixed(2)} KB).`
+        );
       }
 
       // Don't proactively clean up tables - let DuckDB's LRU eviction handle it
@@ -306,7 +311,7 @@ export class App {
       const isLiveTail = this.traceList?.liveTailEnabled ?? false;
       await this._refreshTraces(isLiveTail && isUpdate);
       await this._refreshMetrics();
-      
+
       // Refresh SQL terminal table list if it exists
       if (this.sqlTerminal) {
         this.sqlTerminal.refreshTableList();
@@ -425,9 +430,9 @@ export class App {
         ...this.activeFilters,
         limit: configManager.get('maxTraces'),
       });
-      
+
       console.log(`[App] _refreshTraces: Fetched ${traces.length} traces`);
-      
+
       if (append) {
         // For live tail: append new traces
         console.log('[App] _refreshTraces: Publishing TRACE_BATCH_APPEND');

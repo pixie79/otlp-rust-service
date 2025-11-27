@@ -9,7 +9,7 @@ import { DuckDBError } from '../error.js';
 // DuckDB-WASM v1.30.0 uses Apache Arrow v17 internally.
 // Using Apache Arrow v21 causes silent failures where insertArrowTable appears to succeed
 // but tables are empty or not queryable. See: https://github.com/duckdb/duckdb-wasm/issues/2097
-// 
+//
 // DO NOT upgrade apache-arrow beyond v17.x until DuckDB-WASM updates its dependency.
 // Current version: apache-arrow@^17.0.0 (pinned in package.json)
 
@@ -50,26 +50,26 @@ export class DuckDBClient {
           mainWorker: eh_worker,
         },
       };
-      
+
       console.log('[DuckDBClient] Bundles configured:', {
         mvp: { mainModule: duckdb_wasm, mainWorker: mvp_worker },
         eh: { mainModule: duckdb_wasm_eh, mainWorker: eh_worker },
       });
-      
+
       // Select a bundle based on browser checks
       const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
       console.log('[DuckDBClient] Selected bundle:', bundle);
-      
+
       // AsyncDuckDB always requires a worker, even when running inside a worker
       // We need to create a worker for DuckDB-Wasm to function properly
       // Note: Nested workers are supported in modern browsers
       // DuckDB's worker will handle fetching the WASM file itself, so we pass the URL string
       const logger = new duckdb.ConsoleLogger();
-      
+
       console.log('[DuckDBClient] Creating worker from:', bundle.mainWorker);
       this.worker = new Worker(bundle.mainWorker);
       this.db = new duckdb.AsyncDuckDB(logger, this.worker);
-      
+
       console.log('[DuckDBClient] Instantiating DuckDB with module URL:', bundle.mainModule);
       // Pass the URL string to DuckDB - its worker will fetch and compile the WASM
       // pthreadWorker is optional - only pass if it exists
@@ -77,20 +77,21 @@ export class DuckDBClient {
       console.log('[DuckDBClient] DuckDB instantiated, connecting...');
       this.connection = await this.db.connect();
       console.log('[DuckDBClient] Connected successfully');
-      
+
       // Try to load Arrow extension for Arrow IPC file support
       // Note: DuckDB-WASM's INSTALL command always tries remote first, so we'll use insertArrowTable as primary
       // The extension loading is attempted but not required - insertArrowTable works without it
-      const baseURL = typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8080';
+      const baseURL =
+        typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8080';
       const extensionURL = `${baseURL}/extensions/arrow.duckdb_extension.wasm`;
-      
+
       // Try to load extension directly using LOAD with full URL (bypasses INSTALL)
       // This is a best-effort attempt - if it fails, we use insertArrowTable which works reliably
       try {
         // Register the extension file URL first
         const extensionFileName = 'arrow_ext_local';
         await this.db.registerFileURL(extensionFileName, extensionURL, 'DUCKDB_NATIVE');
-        
+
         // Try to load the extension directly from the registered file
         // DuckDB-WASM may support loading extensions from registered files
         await this.connection.query(`LOAD '${extensionFileName}'`);
@@ -98,13 +99,16 @@ export class DuckDBClient {
       } catch (error) {
         // Extension loading failed - this is expected and OK
         // We'll use insertArrowTable which works reliably without the extension
-        console.log('[DuckDBClient] Arrow extension not available (using insertArrowTable method):', error.message);
+        console.log(
+          '[DuckDBClient] Arrow extension not available (using insertArrowTable method):',
+          error.message
+        );
       }
-      
+
       // Clear all existing tables on initialization to prevent stale data
       // This ensures a clean state when the page is refreshed or server is restarted
       await this.clearAllTables();
-      
+
       this.initialized = true;
       console.log('[DuckDBClient] Initialization complete');
     } catch (error) {
@@ -131,7 +135,7 @@ export class DuckDBClient {
 
     try {
       console.log('[DuckDBClient] Clearing all existing tables...');
-      
+
       // Get all table names from information_schema
       const tablesResult = await this.connection.query(`
         SELECT table_name 
@@ -139,11 +143,11 @@ export class DuckDBClient {
         WHERE table_schema = 'main' 
         AND table_type = 'BASE TABLE'
       `);
-      
+
       if (tablesResult && tablesResult.length > 0) {
-        const tableNames = tablesResult.map(row => row.table_name);
+        const tableNames = tablesResult.map((row) => row.table_name);
         console.log(`[DuckDBClient] Found ${tableNames.length} tables to drop:`, tableNames);
-        
+
         // Drop all tables
         for (const tableName of tableNames) {
           try {
@@ -152,12 +156,12 @@ export class DuckDBClient {
             console.warn(`[DuckDBClient] Failed to drop table ${tableName}:`, dropError);
           }
         }
-        
+
         console.log(`[DuckDBClient] Dropped ${tableNames.length} tables`);
       } else {
         console.log('[DuckDBClient] No existing tables to clear');
       }
-      
+
       // Clear internal tracking
       this.registeredTables.clear();
       this.tableAccessOrder = [];
@@ -170,7 +174,7 @@ export class DuckDBClient {
   /**
    * Register Arrow IPC file
    * Supports both fileURL (for server-served files) and buffer (for local files)
-   * 
+   *
    * @param {string} fileName - Original file name (e.g., "otlp_traces_20251126_221703_0000.arrows")
    * @param {string|ArrayBuffer} fileURLOrBuffer - Either:
    *   - Full URL to the Arrow file (e.g., "http://127.0.0.1:8080/data/otlp/traces/...")
@@ -207,21 +211,25 @@ export class DuckDBClient {
       const isBuffer = fileURLOrBuffer instanceof ArrayBuffer;
       let arrowBuffer;
       let fileURL = null; // Store fileURL for tracking if it's a URL-based file
-      
+
       if (isBuffer) {
         // Local file - use buffer directly
         arrowBuffer = fileURLOrBuffer;
-        console.log('[DuckDBClient] Using local file buffer, size:', arrowBuffer.byteLength, 'bytes');
+        console.log(
+          '[DuckDBClient] Using local file buffer, size:',
+          arrowBuffer.byteLength,
+          'bytes'
+        );
       } else {
         // Server-served file - try registerFileURL + read_arrow() first, then fallback to fetch
         fileURL = fileURLOrBuffer;
         let useInsertArrowTable = false;
-        
+
         try {
           // Register the file URL with DuckDB
           const virtualFileName = `arrow_${tableName}_${Date.now()}`;
           await this.db.registerFileURL(virtualFileName, fileURL, 'DUCKDB_NATIVE');
-          
+
           // Try to create table using read_arrow() (requires extension)
           await this.connection.query(`
             CREATE OR REPLACE TABLE ${tableName} AS 
@@ -230,7 +238,10 @@ export class DuckDBClient {
         } catch (arrowError) {
           // Arrow extension not available or read_arrow() failed
           // Fall back to fetching file and using insertArrowTable
-          console.warn('[DuckDBClient] registerFileURL/read_arrow() failed, falling back to insertArrowTable:', arrowError.message);
+          console.warn(
+            '[DuckDBClient] registerFileURL/read_arrow() failed, falling back to insertArrowTable:',
+            arrowError.message
+          );
           useInsertArrowTable = true;
         }
 
@@ -240,15 +251,21 @@ export class DuckDBClient {
           try {
             const response = await fetch(fileURL);
             if (!response.ok) {
-              throw new Error(`Failed to fetch Arrow file from ${fileURL}: ${response.status} ${response.statusText}`);
+              throw new Error(
+                `Failed to fetch Arrow file from ${fileURL}: ${response.status} ${response.statusText}`
+              );
             }
             arrowBuffer = await response.arrayBuffer();
-            console.log('[DuckDBClient] Fetched Arrow file, size:', arrowBuffer.byteLength, 'bytes');
+            console.log(
+              '[DuckDBClient] Fetched Arrow file, size:',
+              arrowBuffer.byteLength,
+              'bytes'
+            );
           } catch (fetchError) {
             console.error('[DuckDBClient] Failed to fetch Arrow file:', fetchError);
             throw new Error(`Failed to fetch Arrow file from ${fileURL}: ${fetchError.message}`);
           }
-          } else {
+        } else {
           // read_arrow() succeeded, skip insertArrowTable
           arrowBuffer = null;
         }
@@ -266,13 +283,16 @@ export class DuckDBClient {
             WHERE table_schema = 'main' 
             AND table_name = '${tableName}'
           `);
-          const tableExistsInDB = tableExistsCheck && tableExistsCheck.length > 0 && tableExistsCheck[0].count > 0;
-          
+          const tableExistsInDB =
+            tableExistsCheck && tableExistsCheck.length > 0 && tableExistsCheck[0].count > 0;
+
           if (tableExistsInDB) {
-            console.log(`[DuckDBClient] Table ${tableName} exists in DuckDB, dropping before replacement`);
+            console.log(
+              `[DuckDBClient] Table ${tableName} exists in DuckDB, dropping before replacement`
+            );
             await this.connection.query(`DROP TABLE IF EXISTS ${tableName} CASCADE`);
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
             // Verify it's actually dropped
             const verifyDrop = await this.connection.query(`
               SELECT COUNT(*) as count 
@@ -282,26 +302,33 @@ export class DuckDBClient {
             `);
             const stillExists = verifyDrop && verifyDrop.length > 0 && verifyDrop[0].count > 0;
             if (stillExists) {
-              console.warn(`[DuckDBClient] Table ${tableName} still exists after DROP, trying again`);
+              console.warn(
+                `[DuckDBClient] Table ${tableName} still exists after DROP, trying again`
+              );
               await this.connection.query(`DROP TABLE IF EXISTS ${tableName} CASCADE`);
-              await new Promise(resolve => setTimeout(resolve, 100));
+              await new Promise((resolve) => setTimeout(resolve, 100));
             }
           }
         } catch (dropError) {
           console.warn(`[DuckDBClient] Error checking/dropping table ${tableName}:`, dropError);
           // Continue anyway - we'll try to create it and handle the error if it already exists
         }
-        
+
         // Parse Arrow IPC using apache-arrow
         // For streaming Arrow IPC files, tableFromIPC reads all batches and combines them
         const { tableFromIPC } = await import('apache-arrow');
         const table = tableFromIPC(arrowBuffer);
-        console.log('[DuckDBClient] Parsed Arrow table, rows:', table.numRows, 'columns:', table.numCols);
-        
+        console.log(
+          '[DuckDBClient] Parsed Arrow table, rows:',
+          table.numRows,
+          'columns:',
+          table.numCols
+        );
+
         if (isExistingTable) {
           console.log('[DuckDBClient] Replacing existing table with updated data');
         }
-        
+
         try {
           // Double-check table doesn't exist right before inserting
           // This handles race conditions where the table might have been created between our check and insert
@@ -314,71 +341,85 @@ export class DuckDBClient {
             `);
             const stillExists = finalCheck && finalCheck.length > 0 && finalCheck[0].count > 0;
             if (stillExists) {
-              console.log(`[DuckDBClient] Table ${tableName} still exists before insert, dropping again`);
+              console.log(
+                `[DuckDBClient] Table ${tableName} still exists before insert, dropping again`
+              );
               await this.connection.query(`DROP TABLE IF EXISTS ${tableName} CASCADE`);
-              await new Promise(resolve => setTimeout(resolve, 150));
+              await new Promise((resolve) => setTimeout(resolve, 150));
             }
           } catch (checkError) {
             console.warn(`[DuckDBClient] Error checking table before insert:`, checkError);
             // Continue anyway - try to drop and insert
             try {
               await this.connection.query(`DROP TABLE IF EXISTS ${tableName} CASCADE`);
-              await new Promise(resolve => setTimeout(resolve, 150));
-          } catch (dropError) {
+              await new Promise((resolve) => setTimeout(resolve, 150));
+            } catch {
               // Ignore drop errors
             }
           }
-          
+
           // insertArrowTable creates a new table if it doesn't exist
           // IMPORTANT: For streaming Arrow IPC, tableFromIPC already combines all batches
           // into a single table, so we just insert that combined table
-          console.log(`[DuckDBClient] Inserting Arrow table: ${tableName}, expected rows: ${table.numRows}, columns: ${table.numCols}`);
-          
+          console.log(
+            `[DuckDBClient] Inserting Arrow table: ${tableName}, expected rows: ${table.numRows}, columns: ${table.numCols}`
+          );
+
           // Check if table has any data before inserting
           if (table.numRows === 0) {
-            console.warn(`[DuckDBClient] Arrow table has 0 rows - this might be an empty file or parsing issue`);
+            console.warn(
+              `[DuckDBClient] Arrow table has 0 rows - this might be an empty file or parsing issue`
+            );
           }
-          
+
           // Insert the table - this creates the table if it doesn't exist
           // The tableFromIPC function already reads all batches from the streaming file
           // and combines them into a single table
-          console.log(`[DuckDBClient] Inserting Arrow table: ${tableName}, expected rows: ${table.numRows}, columns: ${table.numCols}`);
-          
+          console.log(
+            `[DuckDBClient] Inserting Arrow table: ${tableName}, expected rows: ${table.numRows}, columns: ${table.numCols}`
+          );
+
           // Check if table has any data before inserting
           if (table.numRows === 0) {
-            console.warn(`[DuckDBClient] Arrow table has 0 rows - this might be an empty file or parsing issue`);
+            console.warn(
+              `[DuckDBClient] Arrow table has 0 rows - this might be an empty file or parsing issue`
+            );
           }
-          
+
           // Insert the table - this creates the table if it doesn't exist
           try {
             await this.connection.insertArrowTable(table, { name: tableName });
           } catch (insertError) {
             // If table already exists error, drop and retry
             if (insertError.message && insertError.message.includes('already exists')) {
-              console.warn(`[DuckDBClient] Table ${tableName} exists during insert, dropping and retrying`);
+              console.warn(
+                `[DuckDBClient] Table ${tableName} exists during insert, dropping and retrying`
+              );
               await this.connection.query(`DROP TABLE IF EXISTS ${tableName} CASCADE`);
-              await new Promise(resolve => setTimeout(resolve, 150));
+              await new Promise((resolve) => setTimeout(resolve, 150));
               // Retry insert
               await this.connection.insertArrowTable(table, { name: tableName });
             } else {
               throw insertError;
             }
           }
-          
+
           // Small delay to ensure insert is committed
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
+          await new Promise((resolve) => setTimeout(resolve, 200));
+
           // Note: Verification is skipped because insertArrowTable has known timing issues
           // where tables may not be immediately queryable, but data is actually inserted
           // and will be available for subsequent queries (as we've seen in practice)
-          console.log(`[DuckDBClient] Inserted Arrow table ${tableName} with ${table.numRows} rows (verification skipped due to timing issues)`);
+          console.log(
+            `[DuckDBClient] Inserted Arrow table ${tableName} with ${table.numRows} rows (verification skipped due to timing issues)`
+          );
         } catch (insertError) {
           console.error(`[DuckDBClient] Failed to insert Arrow table ${tableName}:`, insertError);
           console.error(`[DuckDBClient] Error details:`, {
             message: insertError.message,
             stack: insertError.stack,
             tableName,
-            expectedRows: table.numRows
+            expectedRows: table.numRows,
           });
           throw insertError;
         }
@@ -389,11 +430,15 @@ export class DuckDBClient {
       // after insertArrowTable, so we wrap this in a try-catch
       let rowCount = 0;
       try {
-        const rowCountResult = await this.connection.query(`SELECT COUNT(*) as count FROM ${tableName}`);
+        const rowCountResult = await this.connection.query(
+          `SELECT COUNT(*) as count FROM ${tableName}`
+        );
         rowCount = rowCountResult && rowCountResult.length > 0 ? rowCountResult[0].count : 0;
-      } catch (countError) {
+      } catch (_countError) {
         // Table might not be immediately queryable, use expected row count from table
-        console.warn(`[DuckDBClient] Could not get row count for ${tableName} (timing issue), using expected count: ${table.numRows}`);
+        console.warn(
+          `[DuckDBClient] Could not get row count for ${tableName} (timing issue), using expected count: ${table.numRows}`
+        );
         rowCount = table.numRows; // Use the parsed table's row count as fallback
       }
 
@@ -489,7 +534,7 @@ export class DuckDBClient {
       break;
     }
 
-    // If we couldn't evict any table (all were recently accessed/updated), 
+    // If we couldn't evict any table (all were recently accessed/updated),
     // only evict if we're at 100% of max tables (true memory pressure)
     // This is a last resort to prevent memory issues
     if (!evicted && this.registeredTables.size >= this.maxTables) {
@@ -544,7 +589,7 @@ export class DuckDBClient {
       let finalSql = sql;
       if (params && params.length > 0) {
         // Escape single quotes in string parameters
-        const escapedParams = params.map(param => {
+        const escapedParams = params.map((param) => {
           if (typeof param === 'string') {
             // Escape single quotes by doubling them
             return `'${param.replace(/'/g, "''")}'`;
@@ -554,7 +599,7 @@ export class DuckDBClient {
             return String(param);
           }
         });
-        
+
         // Replace ? placeholders with escaped values
         let paramIndex = 0;
         finalSql = sql.replace(/\?/g, () => {
@@ -564,13 +609,13 @@ export class DuckDBClient {
           return '?'; // Keep ? if not enough params
         });
       }
-      
+
       const result = await this.connection.query(finalSql);
-      
+
       // Handle different result formats from DuckDB-Wasm
       // The result format can vary depending on context (worker vs main thread)
       let rows = [];
-      
+
       if (!result) {
         // No result returned
         rows = [];
@@ -593,15 +638,18 @@ export class DuckDBClient {
               }
               rows = result.toArray();
             } catch (materializeError) {
-              console.warn('[DuckDBClient] Materialization failed, trying direct toArray:', materializeError);
+              console.warn(
+                '[DuckDBClient] Materialization failed, trying direct toArray:',
+                materializeError
+              );
               // Try toArray anyway
               rows = result.toArray();
             }
           }
-          
+
           // Convert Row objects to plain objects for postMessage serialization
           // DuckDB-Wasm returns Row objects that can't be cloned
-          rows = rows.map(row => {
+          rows = rows.map((row) => {
             if (row && typeof row.toJSON === 'function') {
               return row.toJSON();
             } else if (row && typeof row === 'object' && row !== null) {
@@ -619,11 +667,16 @@ export class DuckDBClient {
         } catch (toArrayError) {
           // If toArray fails (e.g., "peek" error), try alternative methods
           console.warn('[DuckDBClient] toArray() failed:', toArrayError.message);
-          console.warn('[DuckDBClient] Result type:', typeof result, 'Result keys:', Object.keys(result || {}));
-          
+          console.warn(
+            '[DuckDBClient] Result type:',
+            typeof result,
+            'Result keys:',
+            Object.keys(result || {})
+          );
+
           // Try alternative extraction methods
           if (result.rows && Array.isArray(result.rows)) {
-            rows = result.rows.map(row => {
+            rows = result.rows.map((row) => {
               if (row && typeof row.toJSON === 'function') {
                 return row.toJSON();
               } else if (row && typeof row === 'object' && row !== null) {
@@ -638,7 +691,7 @@ export class DuckDBClient {
               return row;
             });
           } else if (result.data && Array.isArray(result.data)) {
-            rows = result.data.map(row => {
+            rows = result.data.map((row) => {
               if (row && typeof row.toJSON === 'function') {
                 return row.toJSON();
               } else if (row && typeof row === 'object' && row !== null) {
@@ -655,7 +708,7 @@ export class DuckDBClient {
           } else if (result && typeof result[Symbol.iterator] === 'function') {
             // Result is iterable - try to convert
             try {
-              rows = Array.from(result).map(row => {
+              rows = Array.from(result).map((row) => {
                 if (row && typeof row.toJSON === 'function') {
                   return row.toJSON();
                 } else if (row && typeof row === 'object' && row !== null) {
@@ -675,46 +728,52 @@ export class DuckDBClient {
             }
           } else {
             // Last resort: return empty array
-            console.warn('[DuckDBClient] Could not extract rows from result, returning empty array');
+            console.warn(
+              '[DuckDBClient] Could not extract rows from result, returning empty array'
+            );
             rows = [];
           }
         }
       } else if (result && result.rows) {
         // Result has rows property
-        rows = Array.isArray(result.rows) ? result.rows.map(row => {
-          if (row && typeof row.toJSON === 'function') {
-            return row.toJSON();
-          } else if (row && typeof row === 'object' && row !== null) {
-            const plainRow = {};
-            for (const key in row) {
-              if (row.hasOwnProperty(key) && !key.startsWith('_')) {
-                plainRow[key] = row[key];
+        rows = Array.isArray(result.rows)
+          ? result.rows.map((row) => {
+              if (row && typeof row.toJSON === 'function') {
+                return row.toJSON();
+              } else if (row && typeof row === 'object' && row !== null) {
+                const plainRow = {};
+                for (const key in row) {
+                  if (row.hasOwnProperty(key) && !key.startsWith('_')) {
+                    plainRow[key] = row[key];
+                  }
+                }
+                return plainRow;
               }
-            }
-            return plainRow;
-          }
-          return row;
-        }) : [];
+              return row;
+            })
+          : [];
       } else if (result && result.data) {
         // Result has data property
-        rows = Array.isArray(result.data) ? result.data.map(row => {
-          if (row && typeof row.toJSON === 'function') {
-            return row.toJSON();
-          } else if (row && typeof row === 'object' && row !== null) {
-            const plainRow = {};
-            for (const key in row) {
-              if (row.hasOwnProperty(key) && !key.startsWith('_')) {
-                plainRow[key] = row[key];
+        rows = Array.isArray(result.data)
+          ? result.data.map((row) => {
+              if (row && typeof row.toJSON === 'function') {
+                return row.toJSON();
+              } else if (row && typeof row === 'object' && row !== null) {
+                const plainRow = {};
+                for (const key in row) {
+                  if (row.hasOwnProperty(key) && !key.startsWith('_')) {
+                    plainRow[key] = row[key];
+                  }
+                }
+                return plainRow;
               }
-            }
-            return plainRow;
-          }
-          return row;
-        }) : [];
+              return row;
+            })
+          : [];
       } else if (result && typeof result[Symbol.iterator] === 'function') {
         // Result is iterable
         try {
-          rows = Array.from(result).map(row => {
+          rows = Array.from(result).map((row) => {
             if (row && typeof row.toJSON === 'function') {
               return row.toJSON();
             } else if (row && typeof row === 'object' && row !== null) {
@@ -734,7 +793,12 @@ export class DuckDBClient {
         }
       } else {
         // Fallback: log and return empty
-        console.warn('[DuckDBClient] Unknown result format. Type:', typeof result, 'Keys:', Object.keys(result || {}));
+        console.warn(
+          '[DuckDBClient] Unknown result format. Type:',
+          typeof result,
+          'Keys:',
+          Object.keys(result || {})
+        );
         rows = [];
       }
 

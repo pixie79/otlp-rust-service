@@ -80,6 +80,14 @@ async fn test_arrow_ipc_conversion_traces() {
         result.err()
     );
 
+    // Flush to ensure all writes are completed
+    let flush_result = exporter.flush().await;
+    assert!(
+        flush_result.is_ok(),
+        "Failed to flush exporter: {:?}",
+        flush_result.err()
+    );
+
     // Verify file was created
     let traces_dir = temp_dir.path().join("otlp/traces");
     assert!(traces_dir.exists(), "Traces directory should exist");
@@ -93,7 +101,7 @@ async fn test_arrow_ipc_conversion_traces() {
                 .path()
                 .extension()
                 .and_then(|ext| ext.to_str())
-                .map(|ext| ext == "arrow")
+                .map(|ext| ext == "arrows")
                 .unwrap_or(false)
         })
         .collect();

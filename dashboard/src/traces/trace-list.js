@@ -49,7 +49,7 @@ export class TraceList {
 
   _buildDom() {
     this.container.classList.add('trace-list');
-    
+
     // Add header row
     this.header = document.createElement('div');
     this.header.className = 'trace-list__header';
@@ -62,7 +62,7 @@ export class TraceList {
       <div class="trace-row__column timestamp">Time</div>
     `;
     this.container.appendChild(this.header);
-    
+
     this.viewport = document.createElement('div');
     this.viewport.className = 'trace-list__viewport';
 
@@ -75,42 +75,46 @@ export class TraceList {
   }
 
   setTraces(traces = [], append = false) {
-    console.log(`[TraceList] setTraces: ${traces.length} traces, append=${append}, liveTailEnabled=${this.liveTailEnabled}`);
-    
+    console.log(
+      `[TraceList] setTraces: ${traces.length} traces, append=${append}, liveTailEnabled=${this.liveTailEnabled}`
+    );
+
     if (append && this.liveTailEnabled) {
       // For live tail: append new traces that are newer than the latest we've seen
       // Track the maximum timestamp we've seen so far
-      const maxTimestamp = this.traces.length > 0 
-        ? Math.max(...this.traces.map(t => t.startTime || 0))
-        : 0;
-      
+      const maxTimestamp =
+        this.traces.length > 0 ? Math.max(...this.traces.map((t) => t.startTime || 0)) : 0;
+
       // Also check for duplicates using traceId-spanId
-      const existingTraceIds = new Set(this.traces.map(t => `${t.traceId}-${t.spanId}`));
-      
+      const existingTraceIds = new Set(this.traces.map((t) => `${t.traceId}-${t.spanId}`));
+
       // Filter for traces that are either:
       // 1. Newer than our max timestamp, OR
       // 2. Not in our existing trace set (in case timestamps are the same)
-      const newTraces = traces.filter(t => {
+      const newTraces = traces.filter((t) => {
         const isNewer = (t.startTime || 0) > maxTimestamp;
         const isNewId = !existingTraceIds.has(`${t.traceId}-${t.spanId}`);
         return isNewer || isNewId;
       });
-      
-      console.log(`[TraceList] Live tail: ${newTraces.length} new traces out of ${traces.length} total (max timestamp: ${maxTimestamp})`);
-      
+
+      console.log(
+        `[TraceList] Live tail: ${newTraces.length} new traces out of ${traces.length} total (max timestamp: ${maxTimestamp})`
+      );
+
       if (newTraces.length > 0) {
         // Check if user is at bottom (within 100px) to auto-scroll
-        const isNearBottom = this.viewport.scrollHeight - this.viewport.scrollTop - this.viewport.clientHeight < 100;
-        
+        const isNearBottom =
+          this.viewport.scrollHeight - this.viewport.scrollTop - this.viewport.clientHeight < 100;
+
         this.traces = [...this.traces, ...newTraces].sort(sortByStartTimeDesc);
-        
+
         // Limit total traces to prevent memory issues
         if (this.traces.length > 10000) {
           this.traces = this.traces.slice(0, 10000);
         }
-        
+
         this._applyFilters();
-        
+
         // Auto-scroll to bottom if user was near bottom
         if (isNearBottom) {
           this.viewport.scrollTop = this.viewport.scrollHeight;
@@ -118,7 +122,9 @@ export class TraceList {
       }
     } else {
       // Normal mode: replace all traces
-      console.log(`[TraceList] Normal mode: replacing ${this.traces.length} traces with ${traces.length} new traces`);
+      console.log(
+        `[TraceList] Normal mode: replacing ${this.traces.length} traces with ${traces.length} new traces`
+      );
       this.traces = [...traces].sort(sortByStartTimeDesc);
       this.selectedIndex = Math.min(this.selectedIndex, this.traces.length - 1);
       if (this.selectedIndex < 0) {
@@ -132,13 +138,13 @@ export class TraceList {
   toggleLiveTail(enabled, refreshCallback = null) {
     console.log(`[TraceList] toggleLiveTail: ${enabled}, hasCallback=${!!refreshCallback}`);
     this.liveTailEnabled = enabled;
-    
+
     // Clear existing interval
     if (this.liveTailInterval) {
       clearInterval(this.liveTailInterval);
       this.liveTailInterval = null;
     }
-    
+
     if (enabled && refreshCallback) {
       console.log('[TraceList] Starting live tail with 2s interval');
       // Refresh immediately, then every 2 seconds
@@ -150,7 +156,7 @@ export class TraceList {
     } else {
       console.log('[TraceList] Live tail disabled');
     }
-    
+
     this.onLiveTailToggle?.(enabled);
   }
 
@@ -273,7 +279,7 @@ export class TraceList {
     row.dataset.index = String(index);
     // Format trace_id (show first 8 chars for display)
     const traceIdDisplay = trace.traceId ? trace.traceId.substring(0, 8) : 'N/A';
-    
+
     row.innerHTML = `
       <div class="trace-row__column trace-id" title="${escapeHtml(trace.traceId || '')}">${escapeHtml(traceIdDisplay)}</div>
       <div class="trace-row__column span-name">${escapeHtml(trace.name)}</div>

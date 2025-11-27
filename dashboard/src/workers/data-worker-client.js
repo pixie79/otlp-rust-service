@@ -40,7 +40,9 @@ export class DataWorkerClient {
     // Support both fileURL (string) and buffer (ArrayBuffer)
     if (fileURLOrBuffer instanceof ArrayBuffer) {
       // Local file - pass buffer with transfer
-      return this._request('REGISTER_FILE', { fileName, buffer: fileURLOrBuffer }, [fileURLOrBuffer]);
+      return this._request('REGISTER_FILE', { fileName, buffer: fileURLOrBuffer }, [
+        fileURLOrBuffer,
+      ]);
     } else {
       // Server-served file - pass fileURL
       return this._request('REGISTER_FILE', { fileName, fileURL: fileURLOrBuffer });

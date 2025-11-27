@@ -24,8 +24,8 @@ export class MetricQuery {
 
     // Filter to only metrics tables (tables starting with otlp_metrics_)
     // Traces tables don't have metric_name column
-    const metricsTables = tables.filter(tableName => 
-      tableName.startsWith('otlp_metrics_') || tableName.includes('metrics')
+    const metricsTables = tables.filter(
+      (tableName) => tableName.startsWith('otlp_metrics_') || tableName.includes('metrics')
     );
 
     if (!metricsTables.length) {
@@ -109,8 +109,8 @@ export class MetricQuery {
 
     // Filter to only metrics tables (tables starting with otlp_metrics_)
     // Traces tables don't have metric_name column
-    const metricsTables = tables.filter(tableName => 
-      tableName.startsWith('otlp_metrics_') || tableName.includes('metrics')
+    const metricsTables = tables.filter(
+      (tableName) => tableName.startsWith('otlp_metrics_') || tableName.includes('metrics')
     );
 
     if (!metricsTables.length) {
@@ -153,12 +153,12 @@ export class MetricQuery {
           }
         }
       }
-      
+
       // Notify about missing tables if callback is set
       if (failedTables.length > 0 && this.onTableMissing) {
         this.onTableMissing(failedTables);
       }
-      
+
       return Array.from(allNames).sort();
     } catch (error) {
       console.error('Failed to get available metrics:', error);
