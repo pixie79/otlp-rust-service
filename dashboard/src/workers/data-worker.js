@@ -12,10 +12,10 @@ let isInitialized = false;
 const handlers = {
   async INIT() {
     try {
-      console.log('[Worker] Initializing DuckDB client...');
+      console.warn('[Worker] Initializing DuckDB client...');
       await duckdbClient.initialize();
       isInitialized = true;
-      console.log('[Worker] DuckDB client initialized successfully');
+      console.warn('[Worker] DuckDB client initialized successfully');
       return { status: 'ready' };
     } catch (error) {
       isInitialized = false;
@@ -75,7 +75,7 @@ const handlers = {
     // If DuckDB isn't initialized yet, clearing tables is a no-op
     // This is OK - we'll clear tables when DuckDB initializes anyway
     if (!isInitialized) {
-      console.log('[Worker] CLEAR_TABLES called but DuckDB not initialized yet (no-op)');
+      console.warn('[Worker] CLEAR_TABLES called but DuckDB not initialized yet (no-op)');
       return { status: 'cleared', note: 'DuckDB not initialized yet' };
     }
     await duckdbClient.clearAllTables();

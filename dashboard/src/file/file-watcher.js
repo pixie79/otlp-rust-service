@@ -54,7 +54,7 @@ export class FileWatcher {
 
       // Check if file changed (size or modification time)
       if (previous.size !== metadata.size || previous.lastModified !== metadata.lastModified) {
-        console.log(
+        console.warn(
           `[FileWatcher] File changed: ${key}, size: ${previous.size} -> ${metadata.size}, modified: ${previous.lastModified} -> ${metadata.lastModified}`
         );
         // Clear cache for this file to force fresh read

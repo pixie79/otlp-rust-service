@@ -286,7 +286,7 @@ export class App {
         maxSize: 200 * 1024 * 1024, // 200MB max
       });
 
-      console.log(
+      console.warn(
         `[App] Ingesting ${isUpdate ? 'updated' : 'new'} file: ${name}, size: ${buffer.byteLength} bytes`
       );
 
@@ -420,26 +420,26 @@ export class App {
 
   async _refreshTraces(append = false) {
     if (!this.traceQuery || !this.state.tables.size) {
-      console.log('[App] _refreshTraces: No traceQuery or tables available');
+      console.warn('[App] _refreshTraces: No traceQuery or tables available');
       return;
     }
     const tableNames = Array.from(this.state.tables.values());
-    console.log(`[App] _refreshTraces: Querying ${tableNames.length} tables, append=${append}`);
+    console.warn(`[App] _refreshTraces: Querying ${tableNames.length} tables, append=${append}`);
     try {
       const traces = await this.traceQuery.fetchLatestFromTables(tableNames, {
         ...this.activeFilters,
         limit: configManager.get('maxTraces'),
       });
 
-      console.log(`[App] _refreshTraces: Fetched ${traces.length} traces`);
+      console.warn(`[App] _refreshTraces: Fetched ${traces.length} traces`);
 
       if (append) {
         // For live tail: append new traces
-        console.log('[App] _refreshTraces: Publishing TRACE_BATCH_APPEND');
+        console.warn('[App] _refreshTraces: Publishing TRACE_BATCH_APPEND');
         this.workerClient.publish('TRACE_BATCH_APPEND', { traces });
       } else {
         // Normal refresh: replace all traces
-        console.log('[App] _refreshTraces: Publishing TRACE_BATCH');
+        console.warn('[App] _refreshTraces: Publishing TRACE_BATCH');
         this.workerClient.publish('TRACE_BATCH', { traces });
       }
 
@@ -489,7 +489,7 @@ export class App {
         queryExecutor,
         onQueryResult: (result) => {
           // Optional: log query results
-          console.log('SQL query executed:', result);
+          console.warn('SQL query executed:', result);
         },
       });
       this.sqlTerminal.render();

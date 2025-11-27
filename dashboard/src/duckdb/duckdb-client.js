@@ -20,6 +20,22 @@ const sanitizeTableName = (fileName) =>
     .replace(/^_+/, '')
     .toLowerCase() || 'arrow_table';
 
+/**
+ * Check if a value is a plain object (not Date, RegExp, Array, etc.)
+ * @param {any} value - The value to check
+ * @returns {boolean} - True if value is a plain object
+ */
+const isPlainObject = (value) => {
+  return (
+    value &&
+    typeof value === 'object' &&
+    value !== null &&
+    !(value instanceof Date) &&
+    !(value instanceof RegExp) &&
+    !Array.isArray(value)
+  );
+};
+
 export class DuckDBClient {
   constructor(options = {}) {
     this.db = null;
@@ -37,7 +53,7 @@ export class DuckDBClient {
     }
 
     try {
-      console.log('[DuckDBClient] Starting initialization...');
+      console.warn('[DuckDBClient] Starting initialization...');
       // Use Vite approach for DuckDB-Wasm instantiation
       // See: https://duckdb.org/docs/stable/clients/wasm/instantiation
       const MANUAL_BUNDLES = {
@@ -51,14 +67,14 @@ export class DuckDBClient {
         },
       };
 
-      console.log('[DuckDBClient] Bundles configured:', {
+      console.warn('[DuckDBClient] Bundles configured:', {
         mvp: { mainModule: duckdb_wasm, mainWorker: mvp_worker },
         eh: { mainModule: duckdb_wasm_eh, mainWorker: eh_worker },
       });
 
       // Select a bundle based on browser checks
       const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-      console.log('[DuckDBClient] Selected bundle:', bundle);
+      console.warn('[DuckDBClient] Selected bundle:', bundle);
 
       // AsyncDuckDB always requires a worker, even when running inside a worker
       // We need to create a worker for DuckDB-Wasm to function properly
@@ -66,17 +82,17 @@ export class DuckDBClient {
       // DuckDB's worker will handle fetching the WASM file itself, so we pass the URL string
       const logger = new duckdb.ConsoleLogger();
 
-      console.log('[DuckDBClient] Creating worker from:', bundle.mainWorker);
+      console.warn('[DuckDBClient] Creating worker from:', bundle.mainWorker);
       this.worker = new Worker(bundle.mainWorker);
       this.db = new duckdb.AsyncDuckDB(logger, this.worker);
 
-      console.log('[DuckDBClient] Instantiating DuckDB with module URL:', bundle.mainModule);
+      console.warn('[DuckDBClient] Instantiating DuckDB with module URL:', bundle.mainModule);
       // Pass the URL string to DuckDB - its worker will fetch and compile the WASM
       // pthreadWorker is optional - only pass if it exists
       await this.db.instantiate(bundle.mainModule, bundle.pthreadWorker || undefined);
-      console.log('[DuckDBClient] DuckDB instantiated, connecting...');
+      console.warn('[DuckDBClient] DuckDB instantiated, connecting...');
       this.connection = await this.db.connect();
-      console.log('[DuckDBClient] Connected successfully');
+      console.warn('[DuckDBClient] Connected successfully');
 
       // Try to load Arrow extension for Arrow IPC file support
       // Note: DuckDB-WASM's INSTALL command always tries remote first, so we'll use insertArrowTable as primary
@@ -95,11 +111,11 @@ export class DuckDBClient {
         // Try to load the extension directly from the registered file
         // DuckDB-WASM may support loading extensions from registered files
         await this.connection.query(`LOAD '${extensionFileName}'`);
-        console.log('[DuckDBClient] Arrow extension loaded successfully from local file');
+        console.warn('[DuckDBClient] Arrow extension loaded successfully from local file');
       } catch (error) {
         // Extension loading failed - this is expected and OK
         // We'll use insertArrowTable which works reliably without the extension
-        console.log(
+        console.warn(
           '[DuckDBClient] Arrow extension not available (using insertArrowTable method):',
           error.message
         );
@@ -110,7 +126,7 @@ export class DuckDBClient {
       await this.clearAllTables();
 
       this.initialized = true;
-      console.log('[DuckDBClient] Initialization complete');
+      console.warn('[DuckDBClient] Initialization complete');
     } catch (error) {
       console.error('[DuckDBClient] Initialization error:', error);
       console.error('[DuckDBClient] Error details:', {
@@ -134,7 +150,7 @@ export class DuckDBClient {
     }
 
     try {
-      console.log('[DuckDBClient] Clearing all existing tables...');
+      console.warn('[DuckDBClient] Clearing all existing tables...');
 
       // Get all table names from information_schema
       const tablesResult = await this.connection.query(`
@@ -146,7 +162,7 @@ export class DuckDBClient {
 
       if (tablesResult && tablesResult.length > 0) {
         const tableNames = tablesResult.map((row) => row.table_name);
-        console.log(`[DuckDBClient] Found ${tableNames.length} tables to drop:`, tableNames);
+        console.warn(`[DuckDBClient] Found ${tableNames.length} tables to drop:`, tableNames);
 
         // Drop all tables
         for (const tableName of tableNames) {
@@ -157,9 +173,9 @@ export class DuckDBClient {
           }
         }
 
-        console.log(`[DuckDBClient] Dropped ${tableNames.length} tables`);
+        console.warn(`[DuckDBClient] Dropped ${tableNames.length} tables`);
       } else {
-        console.log('[DuckDBClient] No existing tables to clear');
+        console.warn('[DuckDBClient] No existing tables to clear');
       }
 
       // Clear internal tracking
@@ -215,7 +231,7 @@ export class DuckDBClient {
       if (isBuffer) {
         // Local file - use buffer directly
         arrowBuffer = fileURLOrBuffer;
-        console.log(
+        console.warn(
           '[DuckDBClient] Using local file buffer, size:',
           arrowBuffer.byteLength,
           'bytes'
@@ -247,7 +263,7 @@ export class DuckDBClient {
 
         if (useInsertArrowTable) {
           // Fallback: Fetch the file and use insertArrowTable
-          console.log('[DuckDBClient] Fetching Arrow file from URL:', fileURL);
+          console.warn('[DuckDBClient] Fetching Arrow file from URL:', fileURL);
           try {
             const response = await fetch(fileURL);
             if (!response.ok) {
@@ -256,7 +272,7 @@ export class DuckDBClient {
               );
             }
             arrowBuffer = await response.arrayBuffer();
-            console.log(
+            console.warn(
               '[DuckDBClient] Fetched Arrow file, size:',
               arrowBuffer.byteLength,
               'bytes'
@@ -287,7 +303,7 @@ export class DuckDBClient {
             tableExistsCheck && tableExistsCheck.length > 0 && tableExistsCheck[0].count > 0;
 
           if (tableExistsInDB) {
-            console.log(
+            console.warn(
               `[DuckDBClient] Table ${tableName} exists in DuckDB, dropping before replacement`
             );
             await this.connection.query(`DROP TABLE IF EXISTS ${tableName} CASCADE`);
@@ -318,7 +334,7 @@ export class DuckDBClient {
         // For streaming Arrow IPC files, tableFromIPC reads all batches and combines them
         const { tableFromIPC } = await import('apache-arrow');
         const table = tableFromIPC(arrowBuffer);
-        console.log(
+        console.warn(
           '[DuckDBClient] Parsed Arrow table, rows:',
           table.numRows,
           'columns:',
@@ -326,7 +342,7 @@ export class DuckDBClient {
         );
 
         if (isExistingTable) {
-          console.log('[DuckDBClient] Replacing existing table with updated data');
+          console.warn('[DuckDBClient] Replacing existing table with updated data');
         }
 
         try {
@@ -341,7 +357,7 @@ export class DuckDBClient {
             `);
             const stillExists = finalCheck && finalCheck.length > 0 && finalCheck[0].count > 0;
             if (stillExists) {
-              console.log(
+              console.warn(
                 `[DuckDBClient] Table ${tableName} still exists before insert, dropping again`
               );
               await this.connection.query(`DROP TABLE IF EXISTS ${tableName} CASCADE`);
@@ -361,7 +377,7 @@ export class DuckDBClient {
           // insertArrowTable creates a new table if it doesn't exist
           // IMPORTANT: For streaming Arrow IPC, tableFromIPC already combines all batches
           // into a single table, so we just insert that combined table
-          console.log(
+          console.warn(
             `[DuckDBClient] Inserting Arrow table: ${tableName}, expected rows: ${table.numRows}, columns: ${table.numCols}`
           );
 
@@ -375,7 +391,7 @@ export class DuckDBClient {
           // Insert the table - this creates the table if it doesn't exist
           // The tableFromIPC function already reads all batches from the streaming file
           // and combines them into a single table
-          console.log(
+          console.warn(
             `[DuckDBClient] Inserting Arrow table: ${tableName}, expected rows: ${table.numRows}, columns: ${table.numCols}`
           );
 
@@ -410,7 +426,7 @@ export class DuckDBClient {
           // Note: Verification is skipped because insertArrowTable has known timing issues
           // where tables may not be immediately queryable, but data is actually inserted
           // and will be available for subsequent queries (as we've seen in practice)
-          console.log(
+          console.warn(
             `[DuckDBClient] Inserted Arrow table ${tableName} with ${table.numRows} rows (verification skipped due to timing issues)`
           );
         } catch (insertError) {
@@ -434,7 +450,7 @@ export class DuckDBClient {
           `SELECT COUNT(*) as count FROM ${tableName}`
         );
         rowCount = rowCountResult && rowCountResult.length > 0 ? rowCountResult[0].count : 0;
-      } catch (_countError) {
+      } catch {
         // Table might not be immediately queryable, use expected row count from table
         console.warn(
           `[DuckDBClient] Could not get row count for ${tableName} (timing issue), using expected count: ${table.numRows}`
@@ -652,7 +668,7 @@ export class DuckDBClient {
           rows = rows.map((row) => {
             if (row && typeof row.toJSON === 'function') {
               return row.toJSON();
-            } else if (row && typeof row === 'object' && row !== null) {
+            } else if (isPlainObject(row)) {
               // Convert Row object to plain object
               const plainRow = {};
               for (const key in row) {
@@ -679,7 +695,7 @@ export class DuckDBClient {
             rows = result.rows.map((row) => {
               if (row && typeof row.toJSON === 'function') {
                 return row.toJSON();
-              } else if (row && typeof row === 'object' && row !== null) {
+              } else if (isPlainObject(row)) {
                 const plainRow = {};
                 for (const key in row) {
                   if (row.hasOwnProperty(key) && !key.startsWith('_')) {
@@ -694,7 +710,7 @@ export class DuckDBClient {
             rows = result.data.map((row) => {
               if (row && typeof row.toJSON === 'function') {
                 return row.toJSON();
-              } else if (row && typeof row === 'object' && row !== null) {
+              } else if (isPlainObject(row)) {
                 const plainRow = {};
                 for (const key in row) {
                   if (row.hasOwnProperty(key) && !key.startsWith('_')) {
@@ -711,7 +727,7 @@ export class DuckDBClient {
               rows = Array.from(result).map((row) => {
                 if (row && typeof row.toJSON === 'function') {
                   return row.toJSON();
-                } else if (row && typeof row === 'object' && row !== null) {
+                } else if (isPlainObject(row)) {
                   const plainRow = {};
                   for (const key in row) {
                     if (row.hasOwnProperty(key) && !key.startsWith('_')) {
@@ -740,7 +756,7 @@ export class DuckDBClient {
           ? result.rows.map((row) => {
               if (row && typeof row.toJSON === 'function') {
                 return row.toJSON();
-              } else if (row && typeof row === 'object' && row !== null) {
+              } else if (isPlainObject(row)) {
                 const plainRow = {};
                 for (const key in row) {
                   if (row.hasOwnProperty(key) && !key.startsWith('_')) {
@@ -758,7 +774,7 @@ export class DuckDBClient {
           ? result.data.map((row) => {
               if (row && typeof row.toJSON === 'function') {
                 return row.toJSON();
-              } else if (row && typeof row === 'object' && row !== null) {
+              } else if (isPlainObject(row)) {
                 const plainRow = {};
                 for (const key in row) {
                   if (row.hasOwnProperty(key) && !key.startsWith('_')) {
@@ -776,7 +792,7 @@ export class DuckDBClient {
           rows = Array.from(result).map((row) => {
             if (row && typeof row.toJSON === 'function') {
               return row.toJSON();
-            } else if (row && typeof row === 'object' && row !== null) {
+            } else if (isPlainObject(row)) {
               const plainRow = {};
               for (const key in row) {
                 if (row.hasOwnProperty(key) && !key.startsWith('_')) {

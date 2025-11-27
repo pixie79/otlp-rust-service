@@ -75,7 +75,7 @@ export class TraceList {
   }
 
   setTraces(traces = [], append = false) {
-    console.log(
+    console.warn(
       `[TraceList] setTraces: ${traces.length} traces, append=${append}, liveTailEnabled=${this.liveTailEnabled}`
     );
 
@@ -97,7 +97,7 @@ export class TraceList {
         return isNewer || isNewId;
       });
 
-      console.log(
+      console.warn(
         `[TraceList] Live tail: ${newTraces.length} new traces out of ${traces.length} total (max timestamp: ${maxTimestamp})`
       );
 
@@ -122,7 +122,7 @@ export class TraceList {
       }
     } else {
       // Normal mode: replace all traces
-      console.log(
+      console.warn(
         `[TraceList] Normal mode: replacing ${this.traces.length} traces with ${traces.length} new traces`
       );
       this.traces = [...traces].sort(sortByStartTimeDesc);
@@ -136,7 +136,7 @@ export class TraceList {
   }
 
   toggleLiveTail(enabled, refreshCallback = null) {
-    console.log(`[TraceList] toggleLiveTail: ${enabled}, hasCallback=${!!refreshCallback}`);
+    console.warn(`[TraceList] toggleLiveTail: ${enabled}, hasCallback=${!!refreshCallback}`);
     this.liveTailEnabled = enabled;
 
     // Clear existing interval
@@ -146,15 +146,15 @@ export class TraceList {
     }
 
     if (enabled && refreshCallback) {
-      console.log('[TraceList] Starting live tail with 2s interval');
+      console.warn('[TraceList] Starting live tail with 2s interval');
       // Refresh immediately, then every 2 seconds
       refreshCallback();
       this.liveTailInterval = setInterval(() => {
-        console.log('[TraceList] Live tail refresh triggered');
+        console.warn('[TraceList] Live tail refresh triggered');
         refreshCallback();
       }, 2000);
     } else {
-      console.log('[TraceList] Live tail disabled');
+      console.warn('[TraceList] Live tail disabled');
     }
 
     this.onLiveTailToggle?.(enabled);
@@ -197,19 +197,19 @@ export class TraceList {
       return;
     }
     this.unsubscribeWorker = workerClient.subscribe('TRACE_BATCH', ({ traces }) => {
-      console.log(`[TraceList] Received TRACE_BATCH: ${traces?.length ?? 0} traces`);
+      console.warn(`[TraceList] Received TRACE_BATCH: ${traces?.length ?? 0} traces`);
       if (Array.isArray(traces)) {
         this.setTraces(traces, false);
       }
     });
     // Also subscribe to append events for live tail
     workerClient.subscribe('TRACE_BATCH_APPEND', ({ traces }) => {
-      console.log(`[TraceList] Received TRACE_BATCH_APPEND: ${traces?.length ?? 0} traces`);
+      console.warn(`[TraceList] Received TRACE_BATCH_APPEND: ${traces?.length ?? 0} traces`);
       if (Array.isArray(traces)) {
         this.setTraces(traces, true);
       }
     });
-    console.log('[TraceList] Worker subscriptions set up');
+    console.warn('[TraceList] Worker subscriptions set up');
   }
 
   _applyFilters() {

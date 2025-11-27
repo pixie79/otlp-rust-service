@@ -66,7 +66,7 @@ export class FileReaderComponent {
         const freshFile = await fileReference.getFile();
         // Use the fresh file's size to ensure we read all current data
         if (freshFile.size !== file.size) {
-          console.log(
+          console.warn(
             `[FileReader] File size changed: ${file.size} -> ${freshFile.size}, reading fresh data`
           );
         }
