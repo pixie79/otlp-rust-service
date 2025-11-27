@@ -132,3 +132,40 @@ async fn test_dashboard_serves_nested_files() {
     handle.abort();
 }
 
+#[tokio::test]
+async fn test_dashboard_serves_wasm_with_correct_content_type() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let static_dir = temp_dir.path().join("dashboard").join("dist");
+    fs::create_dir_all(&static_dir).unwrap();
+
+    // Create a minimal WASM file (just the header bytes: 0x00 0x61 0x73 0x6d = "\0asm")
+    let wasm_header = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+    fs::write(static_dir.join("test.wasm"), &wasm_header).unwrap();
+
+    let port = find_available_port();
+    let server = DashboardServer::new(static_dir, port, "127.0.0.1");
+    let handle = server.start().await.unwrap();
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let addr = format!("127.0.0.1:{}", port);
+    let mut stream = TcpStream::connect(&addr).await.unwrap();
+
+    let request = "GET /test.wasm HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    stream.write_all(request.as_bytes()).await.unwrap();
+
+    let mut buffer = [0; 4096];
+    let n = stream.read(&mut buffer).await.unwrap();
+    let response = String::from_utf8_lossy(&buffer[..n]);
+
+    // Verify correct MIME type for WASM files (required for WebAssembly compilation)
+    assert!(
+        response.contains("Content-Type: application/wasm"),
+        "Response should contain 'Content-Type: application/wasm', got: {}",
+        response
+    );
+    assert!(response.contains("HTTP/1.1 200 OK"));
+
+    handle.abort();
+}
+

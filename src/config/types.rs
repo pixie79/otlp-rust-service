@@ -37,6 +37,15 @@ pub struct ProtocolConfig {
     /// Port for gRPC with Arrow Flight IPC (default: 4318, configurable)
     #[serde(default = "default_arrow_flight_port")]
     pub arrow_flight_port: u16,
+
+    /// Whether SDK ResourceMetrics extraction is enabled (default: true)
+    ///
+    /// When enabled, allows extraction of metric data from SDK ResourceMetrics
+    /// via opentelemetry-otlp exporter. This requires creating a temporary gRPC
+    /// server and adds overhead. Disable if you only use gRPC ingestion path
+    /// which already preserves protobuf format.
+    #[serde(default = "default_sdk_extraction_enabled")]
+    pub sdk_extraction_enabled: bool,
 }
 
 impl Default for ProtocolConfig {
@@ -46,6 +55,7 @@ impl Default for ProtocolConfig {
             protobuf_port: default_protobuf_port(),
             arrow_flight_enabled: default_arrow_flight_enabled(),
             arrow_flight_port: default_arrow_flight_port(),
+            sdk_extraction_enabled: default_sdk_extraction_enabled(),
         }
     }
 }
@@ -102,6 +112,10 @@ fn default_arrow_flight_enabled() -> bool {
 
 fn default_arrow_flight_port() -> u16 {
     4318
+}
+
+fn default_sdk_extraction_enabled() -> bool {
+    true
 }
 
 /// Configuration for dashboard HTTP server

@@ -1,9 +1,9 @@
 //! Unit tests for Arrow IPC conversion functions
 
+use opentelemetry::KeyValue;
 use opentelemetry::trace::{
     SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
 };
-use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::SpanData;
 use std::time::{Duration, SystemTime};
 
@@ -52,8 +52,8 @@ async fn test_arrow_ipc_conversion_traces() {
     ];
 
     // Import the exporter to test conversion
-    use otlp_arrow_library::otlp::OtlpFileExporter;
     use otlp_arrow_library::Config;
+    use otlp_arrow_library::otlp::OtlpFileExporter;
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -80,6 +80,14 @@ async fn test_arrow_ipc_conversion_traces() {
         result.err()
     );
 
+    // Flush to ensure all writes are completed
+    let flush_result = exporter.flush().await;
+    assert!(
+        flush_result.is_ok(),
+        "Failed to flush exporter: {:?}",
+        flush_result.err()
+    );
+
     // Verify file was created
     let traces_dir = temp_dir.path().join("otlp/traces");
     assert!(traces_dir.exists(), "Traces directory should exist");
@@ -93,7 +101,7 @@ async fn test_arrow_ipc_conversion_traces() {
                 .path()
                 .extension()
                 .and_then(|ext| ext.to_str())
-                .map(|ext| ext == "arrow")
+                .map(|ext| ext == "arrows")
                 .unwrap_or(false)
         })
         .collect();
@@ -143,8 +151,8 @@ async fn test_arrow_ipc_conversion_traces() {
 
 #[tokio::test]
 async fn test_arrow_ipc_conversion_empty_traces() {
-    use otlp_arrow_library::otlp::OtlpFileExporter;
     use otlp_arrow_library::Config;
+    use otlp_arrow_library::otlp::OtlpFileExporter;
     use std::path::PathBuf;
     use tempfile::TempDir;
 

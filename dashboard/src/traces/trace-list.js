@@ -39,12 +39,30 @@ export class TraceList {
     this.onTraceSelected = () => {};
     this.onFilterChanged = () => {};
     this.unsubscribeWorker = null;
+    this.liveTailEnabled = false;
+    this.liveTailInterval = null;
+    this.lastRefreshTime = Date.now();
+    this.onLiveTailToggle = null;
 
     this._buildDom();
   }
 
   _buildDom() {
     this.container.classList.add('trace-list');
+
+    // Add header row
+    this.header = document.createElement('div');
+    this.header.className = 'trace-list__header';
+    this.header.innerHTML = `
+      <div class="trace-row__column trace-id">Trace ID</div>
+      <div class="trace-row__column span-name">Span Name</div>
+      <div class="trace-row__column service-name">Service</div>
+      <div class="trace-row__column duration">Duration</div>
+      <div class="trace-row__column status">Status</div>
+      <div class="trace-row__column timestamp">Time</div>
+    `;
+    this.container.appendChild(this.header);
+
     this.viewport = document.createElement('div');
     this.viewport.className = 'trace-list__viewport';
 
@@ -56,14 +74,98 @@ export class TraceList {
     this.viewport.addEventListener('scroll', () => this._renderWindow());
   }
 
-  setTraces(traces = []) {
-    this.traces = [...traces].sort(sortByStartTimeDesc);
-    this.selectedIndex = Math.min(this.selectedIndex, this.traces.length - 1);
-    if (this.selectedIndex < 0) {
-      this.selectedIndex = -1;
+  setTraces(traces = [], append = false) {
+    console.warn(
+      `[TraceList] setTraces: ${traces.length} traces, append=${append}, liveTailEnabled=${this.liveTailEnabled}`
+    );
+
+    if (append && this.liveTailEnabled) {
+      // For live tail: append new traces that are newer than the latest we've seen
+      // Track the maximum timestamp we've seen so far
+      const maxTimestamp =
+        this.traces.length > 0 ? Math.max(...this.traces.map((t) => t.startTime || 0)) : 0;
+
+      // Also check for duplicates using traceId-spanId
+      const existingTraceIds = new Set(this.traces.map((t) => `${t.traceId}-${t.spanId}`));
+
+      // Filter for traces that are either:
+      // 1. Newer than our max timestamp, OR
+      // 2. Not in our existing trace set (in case timestamps are the same)
+      const newTraces = traces.filter((t) => {
+        const isNewer = (t.startTime || 0) > maxTimestamp;
+        const isNewId = !existingTraceIds.has(`${t.traceId}-${t.spanId}`);
+        return isNewer || isNewId;
+      });
+
+      console.warn(
+        `[TraceList] Live tail: ${newTraces.length} new traces out of ${traces.length} total (max timestamp: ${maxTimestamp})`
+      );
+
+      if (newTraces.length > 0) {
+        // Check if user is at bottom (within 100px) to auto-scroll
+        const isNearBottom =
+          this.viewport.scrollHeight - this.viewport.scrollTop - this.viewport.clientHeight < 100;
+
+        this.traces = [...this.traces, ...newTraces].sort(sortByStartTimeDesc);
+
+        // Limit total traces to prevent memory issues
+        if (this.traces.length > 10000) {
+          this.traces = this.traces.slice(0, 10000);
+        }
+
+        this._applyFilters();
+
+        // Auto-scroll to bottom if user was near bottom
+        if (isNearBottom) {
+          this.viewport.scrollTop = this.viewport.scrollHeight;
+        }
+      }
+    } else {
+      // Normal mode: replace all traces
+      console.warn(
+        `[TraceList] Normal mode: replacing ${this.traces.length} traces with ${traces.length} new traces`
+      );
+      this.traces = [...traces].sort(sortByStartTimeDesc);
+      this.selectedIndex = Math.min(this.selectedIndex, this.traces.length - 1);
+      if (this.selectedIndex < 0) {
+        this.selectedIndex = -1;
+      }
+      this.viewport.scrollTop = 0;
+      this._applyFilters();
     }
-    this.viewport.scrollTop = 0;
-    this._applyFilters();
+  }
+
+  toggleLiveTail(enabled, refreshCallback = null) {
+    console.warn(`[TraceList] toggleLiveTail: ${enabled}, hasCallback=${!!refreshCallback}`);
+    this.liveTailEnabled = enabled;
+
+    // Clear existing interval
+    if (this.liveTailInterval) {
+      clearInterval(this.liveTailInterval);
+      this.liveTailInterval = null;
+    }
+
+    if (enabled && refreshCallback) {
+      console.warn('[TraceList] Starting live tail with 2s interval');
+      // Refresh immediately, then every 2 seconds
+      refreshCallback();
+      this.liveTailInterval = setInterval(() => {
+        console.warn('[TraceList] Live tail refresh triggered');
+        refreshCallback();
+      }, 2000);
+    } else {
+      console.warn('[TraceList] Live tail disabled');
+    }
+
+    this.onLiveTailToggle?.(enabled);
+  }
+
+  destroy() {
+    if (this.liveTailInterval) {
+      clearInterval(this.liveTailInterval);
+      this.liveTailInterval = null;
+    }
+    this.unsubscribeWorker?.();
   }
 
   applyFilters(filters = {}) {
@@ -91,13 +193,23 @@ export class TraceList {
   bindWorker(workerClient) {
     this.unsubscribeWorker?.();
     if (!workerClient || typeof workerClient.subscribe !== 'function') {
+      console.warn('[TraceList] bindWorker: workerClient does not support subscribe');
       return;
     }
     this.unsubscribeWorker = workerClient.subscribe('TRACE_BATCH', ({ traces }) => {
+      console.warn(`[TraceList] Received TRACE_BATCH: ${traces?.length ?? 0} traces`);
       if (Array.isArray(traces)) {
-        this.setTraces(traces);
+        this.setTraces(traces, false);
       }
     });
+    // Also subscribe to append events for live tail
+    workerClient.subscribe('TRACE_BATCH_APPEND', ({ traces }) => {
+      console.warn(`[TraceList] Received TRACE_BATCH_APPEND: ${traces?.length ?? 0} traces`);
+      if (Array.isArray(traces)) {
+        this.setTraces(traces, true);
+      }
+    });
+    console.warn('[TraceList] Worker subscriptions set up');
   }
 
   _applyFilters() {
@@ -165,7 +277,11 @@ export class TraceList {
     row.style.top = `${index * this.rowHeight}px`;
     row.style.height = `${this.rowHeight}px`;
     row.dataset.index = String(index);
+    // Format trace_id (show first 8 chars for display)
+    const traceIdDisplay = trace.traceId ? trace.traceId.substring(0, 8) : 'N/A';
+
     row.innerHTML = `
+      <div class="trace-row__column trace-id" title="${escapeHtml(trace.traceId || '')}">${escapeHtml(traceIdDisplay)}</div>
       <div class="trace-row__column span-name">${escapeHtml(trace.name)}</div>
       <div class="trace-row__column service-name">${escapeHtml(trace.serviceName)}</div>
       <div class="trace-row__column duration">${duration.toFixed(2)} ms</div>

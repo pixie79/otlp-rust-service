@@ -59,14 +59,14 @@ async fn test_metrics_protobuf_e2e_public_api() {
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();
 
-    // Step 1: Export metrics via public API (ResourceMetrics)
-    let metrics = SdkResourceMetrics::default();
+    // Step 1: Export metrics via public API (Protobuf)
+    let metrics_request = create_test_protobuf_metrics_request();
     library
-        .export_metrics(metrics)
+        .export_metrics(metrics_request)
         .await
         .expect("Failed to export metrics");
 
-    // Step 2: Verify metrics are stored in buffer (as protobuf internally)
+    // Step 2: Verify metrics are written to Arrow files
     // We can't directly access the buffer, but we can verify via flush
     sleep(Duration::from_millis(500)).await;
 
@@ -200,15 +200,15 @@ async fn test_metrics_protobuf_e2e_multiple_sources() {
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();
 
-    // Step 1: Export via public API (converts ResourceMetrics → protobuf → stores)
-    let metrics1 = SdkResourceMetrics::default();
+    // Step 1: Export via public API (Protobuf)
+    let metrics1 = create_test_protobuf_metrics_request();
     library
         .export_metrics(metrics1)
         .await
         .expect("Failed to export metrics via public API");
 
     // Step 2: Export another via public API
-    let metrics2 = SdkResourceMetrics::default();
+    let metrics2 = create_test_protobuf_metrics_request();
     library
         .export_metrics(metrics2)
         .await

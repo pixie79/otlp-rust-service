@@ -1,9 +1,9 @@
 //! Unit tests for batch buffer functionality
 
+use opentelemetry::KeyValue;
 use opentelemetry::trace::{
     SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
 };
-use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::SpanData;
 use otlp_arrow_library::otlp::BatchBuffer;
 use std::time::{Duration, SystemTime};

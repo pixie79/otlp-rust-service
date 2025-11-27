@@ -10,6 +10,7 @@ fn test_valid_protocol_config_both_enabled() {
         protobuf_port: 4317,
         arrow_flight_enabled: true,
         arrow_flight_port: 4318,
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_ok());
@@ -22,6 +23,7 @@ fn test_valid_protocol_config_only_protobuf() {
         protobuf_port: 4317,
         arrow_flight_enabled: false,
         arrow_flight_port: 4318,
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_ok());
@@ -34,6 +36,7 @@ fn test_valid_protocol_config_only_arrow_flight() {
         protobuf_port: 4317,
         arrow_flight_enabled: true,
         arrow_flight_port: 4318,
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_ok());
@@ -46,6 +49,7 @@ fn test_both_protocols_disabled_fails_validation() {
         protobuf_port: 4317,
         arrow_flight_enabled: false,
         arrow_flight_port: 4318,
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_err());
@@ -64,6 +68,7 @@ fn test_same_port_when_both_enabled_fails_validation() {
         protobuf_port: 4317,
         arrow_flight_enabled: true,
         arrow_flight_port: 4317, // Same port
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_err());
@@ -82,6 +87,7 @@ fn test_zero_protobuf_port_fails_validation() {
         protobuf_port: 0, // Invalid port
         arrow_flight_enabled: false,
         arrow_flight_port: 4318,
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_err());
@@ -100,6 +106,7 @@ fn test_zero_arrow_flight_port_fails_validation() {
         protobuf_port: 4317,
         arrow_flight_enabled: true,
         arrow_flight_port: 0, // Invalid port
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_err());
@@ -118,6 +125,7 @@ fn test_valid_port_range() {
         protobuf_port: 1, // Minimum valid port
         arrow_flight_enabled: true,
         arrow_flight_port: 65535, // Maximum valid port
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_ok());
@@ -131,6 +139,7 @@ fn test_protocol_config_in_full_config() {
         protobuf_port: 4317,
         arrow_flight_enabled: false,
         arrow_flight_port: 4318,
+        sdk_extraction_enabled: true,
     };
 
     let config = ConfigBuilder::new()
@@ -155,6 +164,7 @@ fn test_different_ports_when_both_enabled_passes() {
         protobuf_port: 4317,
         arrow_flight_enabled: true,
         arrow_flight_port: 4318,
+        sdk_extraction_enabled: true,
     };
 
     assert!(protocols.validate().is_ok());
@@ -165,6 +175,7 @@ fn test_different_ports_when_both_enabled_passes() {
         protobuf_port: 5000,
         arrow_flight_enabled: true,
         arrow_flight_port: 5001,
+        sdk_extraction_enabled: true,
     };
     assert!(protocols2.validate().is_ok());
 }

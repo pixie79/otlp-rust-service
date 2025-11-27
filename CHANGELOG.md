@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-11-27
+
+### Changed
+- **Rust Edition**: Upgraded from Rust 2021 to Rust 2024 edition
+  - Improved async drop order semantics
+  - Access to latest Rust language features
+  - Automatic migration via `cargo fix --edition`
+
+### Added
+- **Demo Application**: Added `examples/demo-app.rs` - A comprehensive demo application that demonstrates OTLP SDK usage
+  - Enables dashboard by default for real-time telemetry visualization
+  - Generates and exports mock metrics and spans
+  - Demonstrates parent-child span relationships and different span kinds
+  - Includes continuous data generation mode with graceful shutdown
+  - Serves as a reference implementation for developers integrating the SDK
+  - Well-documented with extensive comments explaining all SDK usage patterns
+- **Live Tail Feature**: Real-time trace list updates with automatic scrolling
+  - Tracks maximum timestamp to detect new traces efficiently
+  - Auto-scrolls to bottom when user is near the end
+  - Deduplicates traces using both timestamp and trace ID
+- **Database State Management**: Automatic table clearing when selecting new directories
+  - Clears all DuckDB tables on directory selection for fresh start
+  - Handles initialization timing gracefully
+  - Prevents stale data from interfering with new sessions
+
+### Changed
+- **Metrics Ingestion**: Removed Arrow Flight ingestion for metrics (Protobuf-only)
+  - Simplifies architecture by eliminating `ResourceMetrics` private field workarounds
+  - Protobuf ingestion remains fully supported via gRPC endpoint and direct API
+  - Arrow IPC remains the internal storage format
+  - Arrow Flight export option still available for forwarding
+- **Arrow IPC File Format**: Changed from Arrow IPC File format to Arrow IPC Streaming format
+  - File extension changed from `.arrow` to `.arrows` to indicate streaming format
+  - Better suited for continuous writing and sequential reading
+  - Improved compatibility with DuckDB-WASM and streaming readers
+- **Dashboard File Handling**: Improved file ingestion and state management
+  - Better error handling for missing tables
+  - Automatic cleanup of stale table references
+  - Support for both local files (File System Access API) and server-served files
+  - Fixed timing issues with `insertArrowTable` verification
+
+### Fixed
+- **Live Tail Detection**: Fixed issue where live tail showed 0 new traces
+  - Now tracks maximum timestamp to properly detect new traces
+  - Handles cases where queries return all traces (including old ones)
+- **Table Creation Timing**: Fixed race conditions in table creation and verification
+  - Improved error handling for tables that aren't immediately queryable
+  - Better handling of "table already exists" errors during updates
+- **Database Initialization**: Fixed error when clearing tables before DuckDB initialization
+  - `CLEAR_TABLES` now gracefully handles uninitialized state
+  - Prevents errors from breaking directory selection flow
+- **Missing Table Errors**: Improved error handling for tables that don't exist
+  - Better detection of "table does not exist" vs other errors
+  - Automatic cleanup of stale table references from state
+
 ## [0.3.0] - 2025-11-25
 
 ### Added

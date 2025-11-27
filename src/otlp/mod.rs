@@ -44,13 +44,13 @@ pub mod batch_writer;
 pub mod converter;
 pub mod exporter;
 pub mod forwarder;
+pub mod metrics_converter;
+pub mod metrics_data;
+pub mod metrics_extractor;
 pub mod server;
 pub mod server_arrow;
 
 pub use batch_writer::BatchBuffer;
-pub use exporter::{
-    ExportFormat, FileMetricExporter, FileSpanExporter, OtlpFileExporter, OtlpMetricExporter,
-    OtlpSpanExporter,
-};
+pub use exporter::{ExportFormat, FileSpanExporter, OtlpFileExporter, OtlpSpanExporter};
 pub use server::{MetricsServiceImpl, OtlpGrpcServer, TraceServiceImpl};
 pub use server_arrow::OtlpArrowFlightServer;

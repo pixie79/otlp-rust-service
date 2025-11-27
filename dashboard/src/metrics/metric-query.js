@@ -22,23 +22,43 @@ export class MetricQuery {
       return [];
     }
 
+    // Filter to only metrics tables (tables starting with otlp_metrics_)
+    // Traces tables don't have metric_name column
+    const metricsTables = tables.filter(
+      (tableName) => tableName.startsWith('otlp_metrics_') || tableName.includes('metrics')
+    );
+
+    if (!metricsTables.length) {
+      return [];
+    }
+
     const { sql: whereSql, params } = this._buildPredicate(filters);
     const limit = filters.limit ?? this.limit;
 
-    // Query each table and combine results
-    const queries = tables.map((tableName) => {
+    // Query each metrics table and combine results
+    const queries = metricsTables.map((tableName) => {
       const sql = `
         SELECT * FROM ${tableName}
         ${whereSql}
         ORDER BY timestamp_unix_nano ASC
         LIMIT ${limit}
       `;
-      return this.execute(sql, [...params]);
+      return this.execute(sql, [...params]).catch((error) => {
+        // Handle missing tables gracefully (e.g., evicted tables)
+        // Return empty result instead of throwing
+        console.warn(`Query failed for table ${tableName}:`, error.message);
+        return { rows: [], error: error.message, tableName };
+      });
     });
 
     try {
-      const results = await Promise.all(queries);
-      const rows = results.flatMap((result) => result.rows ?? []);
+      // Use allSettled to handle individual query failures gracefully
+      const results = await Promise.allSettled(queries);
+      const rows = results
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value)
+        .filter((result) => !result.error) // Filter out results with errors
+        .flatMap((result) => result.rows ?? []);
       return rows.map((row) => createMetricEntry(row));
     } catch (error) {
       console.error('Metric query failed:', error);
@@ -87,27 +107,58 @@ export class MetricQuery {
       return [];
     }
 
-    // Query each table for distinct metric names
-    const queries = tables.map((tableName) => {
+    // Filter to only metrics tables (tables starting with otlp_metrics_)
+    // Traces tables don't have metric_name column
+    const metricsTables = tables.filter(
+      (tableName) => tableName.startsWith('otlp_metrics_') || tableName.includes('metrics')
+    );
+
+    if (!metricsTables.length) {
+      return [];
+    }
+
+    // Query each metrics table for distinct metric names
+    const queries = metricsTables.map((tableName) => {
       const sql = `
         SELECT DISTINCT metric_name 
         FROM ${tableName}
         WHERE metric_name IS NOT NULL AND metric_name != ''
       `;
-      return this.execute(sql, []);
+      return this.execute(sql, []).catch((error) => {
+        // Handle missing tables gracefully (e.g., evicted tables)
+        console.warn(`Query failed for table ${tableName}:`, error.message);
+        return { rows: [], error: error.message, tableName };
+      });
     });
 
     try {
-      const results = await Promise.all(queries);
+      // Use allSettled to handle individual query failures gracefully
+      const results = await Promise.allSettled(queries);
+      const failedTables = [];
       const allNames = new Set();
       for (const result of results) {
-        for (const row of result.rows || []) {
-          const name = row.metric_name || row.metricName;
-          if (name) {
-            allNames.add(name);
+        if (result.status === 'fulfilled') {
+          const value = result.value;
+          if (value.error) {
+            if (value.tableName) {
+              failedTables.push(value.tableName);
+            }
+            continue;
+          }
+          for (const row of value.rows || []) {
+            const name = row.metric_name || row.metricName;
+            if (name) {
+              allNames.add(name);
+            }
           }
         }
       }
+
+      // Notify about missing tables if callback is set
+      if (failedTables.length > 0 && this.onTableMissing) {
+        this.onTableMissing(failedTables);
+      }
+
       return Array.from(allNames).sort();
     } catch (error) {
       console.error('Failed to get available metrics:', error);

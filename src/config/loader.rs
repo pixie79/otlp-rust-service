@@ -194,17 +194,17 @@ impl ConfigLoader {
         }
 
         // OTLP_TRACE_CLEANUP_INTERVAL_SECS
-        if let Ok(interval) = env::var("OTLP_TRACE_CLEANUP_INTERVAL_SECS") {
-            if let Ok(secs) = interval.parse::<u64>() {
-                config.trace_cleanup_interval_secs = secs;
-            }
+        if let Ok(interval) = env::var("OTLP_TRACE_CLEANUP_INTERVAL_SECS")
+            && let Ok(secs) = interval.parse::<u64>()
+        {
+            config.trace_cleanup_interval_secs = secs;
         }
 
         // OTLP_METRIC_CLEANUP_INTERVAL_SECS
-        if let Ok(interval) = env::var("OTLP_METRIC_CLEANUP_INTERVAL_SECS") {
-            if let Ok(secs) = interval.parse::<u64>() {
-                config.metric_cleanup_interval_secs = secs;
-            }
+        if let Ok(interval) = env::var("OTLP_METRIC_CLEANUP_INTERVAL_SECS")
+            && let Ok(secs) = interval.parse::<u64>()
+        {
+            config.metric_cleanup_interval_secs = secs;
         }
 
         // OTLP_PROTOBUF_ENABLED
@@ -296,28 +296,28 @@ impl ConfigLoader {
         }
 
         // OTLP_FORWARDING_ENABLED
-        if let Ok(enabled) = env::var("OTLP_FORWARDING_ENABLED") {
-            if enabled.parse::<bool>().unwrap_or(false) {
-                let mut forwarding = config.forwarding.take().unwrap_or_default();
-                forwarding.enabled = true;
+        if let Ok(enabled) = env::var("OTLP_FORWARDING_ENABLED")
+            && enabled.parse::<bool>().unwrap_or(false)
+        {
+            let mut forwarding = config.forwarding.take().unwrap_or_default();
+            forwarding.enabled = true;
 
-                // OTLP_FORWARDING_ENDPOINT_URL
-                if let Ok(url) = env::var("OTLP_FORWARDING_ENDPOINT_URL") {
-                    forwarding.endpoint_url = Some(url);
-                }
-
-                // OTLP_FORWARDING_PROTOCOL
-                if let Ok(protocol) = env::var("OTLP_FORWARDING_PROTOCOL") {
-                    use crate::config::types::ForwardingProtocol;
-                    forwarding.protocol = match protocol.to_lowercase().as_str() {
-                        "protobuf" => ForwardingProtocol::Protobuf,
-                        "arrow_flight" | "arrowflight" => ForwardingProtocol::ArrowFlight,
-                        _ => ForwardingProtocol::default(),
-                    };
-                }
-
-                config.forwarding = Some(forwarding);
+            // OTLP_FORWARDING_ENDPOINT_URL
+            if let Ok(url) = env::var("OTLP_FORWARDING_ENDPOINT_URL") {
+                forwarding.endpoint_url = Some(url);
             }
+
+            // OTLP_FORWARDING_PROTOCOL
+            if let Ok(protocol) = env::var("OTLP_FORWARDING_PROTOCOL") {
+                use crate::config::types::ForwardingProtocol;
+                forwarding.protocol = match protocol.to_lowercase().as_str() {
+                    "protobuf" => ForwardingProtocol::Protobuf,
+                    "arrow_flight" | "arrowflight" => ForwardingProtocol::ArrowFlight,
+                    _ => ForwardingProtocol::default(),
+                };
+            }
+
+            config.forwarding = Some(forwarding);
         }
 
         // OTLP_DASHBOARD_ENABLED

@@ -3,12 +3,13 @@
 //! Provides programmatic API methods for sending OTLP messages without using gRPC.
 
 use crate::config::Config;
+use crate::dashboard::server::DashboardServer;
 use crate::error::OtlpError;
 use crate::otlp::{BatchBuffer, OtlpFileExporter};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::time::{interval, Duration};
-use tracing::{info, warn};
+use tokio::time::{Duration, interval};
+use tracing::{error, info, warn};
 
 /// Main library instance for embedded usage
 ///
@@ -51,6 +52,7 @@ pub struct OtlpLibrary {
     batch_buffer: Arc<BatchBuffer>,
     write_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     cleanup_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
+    dashboard_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl OtlpLibrary {
@@ -125,34 +127,20 @@ impl OtlpLibrary {
                 if batch_buffer_clone.should_write().await {
                     // Take buffered traces
                     let traces = batch_buffer_clone.take_traces().await;
-                    if !traces.is_empty() {
-                        if let Err(e) = file_exporter_clone.export_traces(traces).await {
-                            warn!("Failed to export traces: {}", e);
-                        }
+                    if !traces.is_empty()
+                        && let Err(e) = file_exporter_clone.export_traces(traces).await
+                    {
+                        warn!("Failed to export traces: {}", e);
                     }
 
-                    // Take buffered metrics (in protobuf format)
+                    // Take buffered metrics (in protobuf format) and export directly
+                    // Note: The batch buffer no longer stores metrics in protobuf format
+                    // This code path is kept for backward compatibility but should not be used
                     let metrics_protobuf = batch_buffer_clone.take_metrics().await;
-                    for metric_request in metrics_protobuf {
-                        // Convert protobuf to ResourceMetrics for export
-                        match crate::otlp::server::convert_metrics_request_to_resource_metrics(
-                            &metric_request,
-                        ) {
-                            Ok(Some(metrics)) => {
-                                if let Err(e) = file_exporter_clone.export_metrics(&metrics).await {
-                                    warn!("Failed to export metrics: {}", e);
-                                }
-                            }
-                            Ok(None) => {
-                                // Empty metrics, skip
-                            }
-                            Err(e) => {
-                                warn!(
-                                    "Failed to convert protobuf metrics to ResourceMetrics: {}",
-                                    e
-                                );
-                            }
-                        }
+                    if !metrics_protobuf.is_empty() {
+                        warn!(
+                            "Batch buffer contains protobuf metrics - this should not happen with new API"
+                        );
                     }
 
                     batch_buffer_clone.update_last_write().await;
@@ -202,6 +190,42 @@ impl OtlpLibrary {
             metric_cleanup_handle,
         ]));
 
+        // Start dashboard HTTP server if enabled
+        let dashboard_handle = Arc::new(Mutex::new(None));
+        if config.dashboard.enabled {
+            let dashboard_server = DashboardServer::new(
+                config.dashboard.static_dir.clone(),
+                config.output_dir.clone(),
+                config.dashboard.port,
+                config.dashboard.bind_address.clone(),
+            );
+
+            match dashboard_server.start().await {
+                Ok(handle) => {
+                    info!(
+                        port = config.dashboard.port,
+                        bind_address = %config.dashboard.bind_address,
+                        static_dir = %config.dashboard.static_dir.display(),
+                        "Dashboard HTTP server started"
+                    );
+                    info!(
+                        "Dashboard available at http://{}:{}",
+                        config.dashboard.bind_address, config.dashboard.port
+                    );
+                    {
+                        let mut handle_guard = dashboard_handle.lock().await;
+                        *handle_guard = Some(handle);
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        error = %e,
+                        "Failed to start dashboard HTTP server, continuing without dashboard"
+                    );
+                }
+            }
+        }
+
         info!(
             "OTLP library initialized with output directory: {}",
             config.output_dir.display()
@@ -213,6 +237,7 @@ impl OtlpLibrary {
             batch_buffer,
             write_handle,
             cleanup_handles,
+            dashboard_handle,
         })
     }
 
@@ -303,57 +328,18 @@ impl OtlpLibrary {
         self.batch_buffer.add_traces(spans).await
     }
 
-    /// Export metrics
+    /// Export metrics from Protobuf format
     ///
-    /// Adds metrics to the internal buffer. The metrics will be written to disk when
-    /// the write interval elapses or when `flush()` is called.
-    ///
-    /// # Arguments
-    ///
-    /// * `metrics` - The OpenTelemetry resource metrics to export
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the metrics were successfully buffered, or `Err(OtlpError)` if
-    /// the buffer is full or an error occurs.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use otlp_arrow_library::OtlpLibrary;
-    /// use opentelemetry_sdk::metrics::data::ResourceMetrics;
-    ///
-    /// # async fn example(library: OtlpLibrary, metrics: ResourceMetrics) -> Result<(), otlp_arrow_library::OtlpError> {
-    /// library.export_metrics(metrics).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn export_metrics(
-        &self,
-        metrics: opentelemetry_sdk::metrics::data::ResourceMetrics,
-    ) -> Result<(), OtlpError> {
-        // Convert ResourceMetrics to protobuf for storage (ResourceMetrics doesn't implement Clone)
-        let converter = crate::otlp::converter::FormatConverter::new();
-        let protobuf_request = converter.resource_metrics_to_protobuf(&metrics)?;
-
-        if let Some(request) = protobuf_request {
-            self.batch_buffer.add_metrics_protobuf(request).await
-        } else {
-            Ok(()) // Empty metrics, nothing to store
-        }
-    }
-
-    /// Export metrics by reference
-    ///
-    /// Adds metrics to the internal buffer by reference, avoiding unnecessary data copying.
-    /// This method is more efficient than `export_metrics` when integrating with OpenTelemetry SDK's
-    /// periodic readers that pass metrics as references rather than owned values.
+    /// Accepts metrics in Protobuf format (ExportMetricsServiceRequest) and converts
+    /// them to Arrow IPC format internally, then writes to disk. This method is
+    /// compatible with OpenTelemetry SDK's metric exporters and does not require
+    /// the temporary proxy server.
     ///
     /// The metrics will be written to disk when the write interval elapses or when `flush()` is called.
     ///
     /// # Arguments
     ///
-    /// * `metrics` - A reference to the OpenTelemetry resource metrics to export
+    /// * `request` - The OpenTelemetry Protobuf metrics export request
     ///
     /// # Returns
     ///
@@ -364,54 +350,21 @@ impl OtlpLibrary {
     ///
     /// ```no_run
     /// use otlp_arrow_library::OtlpLibrary;
-    /// use opentelemetry_sdk::metrics::data::ResourceMetrics;
+    /// use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
     ///
-    /// # async fn example(library: OtlpLibrary, metrics: &ResourceMetrics) -> Result<(), otlp_arrow_library::OtlpError> {
-    /// library.export_metrics_ref(metrics).await?;
+    /// # async fn example(library: OtlpLibrary, request: ExportMetricsServiceRequest) -> Result<(), otlp_arrow_library::OtlpError> {
+    /// library.export_metrics(request).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn export_metrics_ref(
+    pub async fn export_metrics(
         &self,
-        metrics: &opentelemetry_sdk::metrics::data::ResourceMetrics,
+        request: opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest,
     ) -> Result<(), OtlpError> {
-        // Convert ResourceMetrics to protobuf for storage (FormatConverter already accepts reference)
-        let converter = crate::otlp::converter::FormatConverter::new();
-        let protobuf_request = converter.resource_metrics_to_protobuf(metrics)?;
-
-        if let Some(request) = protobuf_request {
-            self.batch_buffer.add_metrics_protobuf(request).await
-        } else {
-            Ok(()) // Empty metrics, nothing to store
-        }
-    }
-
-    /// Create a PushMetricExporter implementation for use with OpenTelemetry SDK
-    ///
-    /// This method returns a `PushMetricExporter` that exports metrics via this `OtlpLibrary`
-    /// instance. The exporter can be used directly with OpenTelemetry SDK's `PeriodicReader`
-    /// or `ManualReader`.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `PushMetricExporter` implementation that delegates to this library instance.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use otlp_arrow_library::OtlpLibrary;
-    /// use opentelemetry_sdk::metrics::PeriodicReader;
-    ///
-    /// # async fn example(library: OtlpLibrary) -> Result<(), Box<dyn std::error::Error>> {
-    /// let metric_exporter = library.metric_exporter();
-    /// let reader = PeriodicReader::builder(metric_exporter)
-    ///     .with_interval(std::time::Duration::from_secs(10))
-    ///     .build();
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn metric_exporter(&self) -> crate::otlp::OtlpMetricExporter {
-        crate::otlp::OtlpMetricExporter::new(Arc::new(self.clone()))
+        // Use file exporter's method to convert protobuf to Arrow and write
+        self.file_exporter
+            .export_metrics_from_protobuf(&request)
+            .await
     }
 
     /// Create a SpanExporter implementation for use with OpenTelemetry SDK
@@ -473,26 +426,11 @@ impl OtlpLibrary {
             self.file_exporter.export_traces(traces).await?;
         }
 
-        // Take buffered metrics (in protobuf format) and convert to ResourceMetrics for export
+        // Take buffered metrics (in protobuf format) and export directly
         let metrics_protobuf = self.batch_buffer.take_metrics().await;
         for metric_request in metrics_protobuf {
-            match crate::otlp::server::convert_metrics_request_to_resource_metrics(&metric_request)
-            {
-                Ok(Some(metrics)) => {
-                    self.file_exporter.export_metrics(&metrics).await?;
-                }
-                Ok(None) => {
-                    // Empty metrics, skip
-                }
-                Err(e) => {
-                    return Err(OtlpError::Export(
-                        crate::error::OtlpExportError::FormatConversionError(format!(
-                            "Failed to convert protobuf metrics to ResourceMetrics: {}",
-                            e
-                        )),
-                    ));
-                }
-            }
+            // Use the new export_metrics that accepts protobuf directly
+            self.export_metrics(metric_request).await?;
         }
 
         // Flush file writers
@@ -543,6 +481,12 @@ impl OtlpLibrary {
     pub async fn shutdown(&self) -> Result<(), OtlpError> {
         // Flush all pending writes
         self.flush().await?;
+
+        // Stop dashboard server if running
+        let mut dashboard_guard = self.dashboard_handle.lock().await;
+        if let Some(handle) = dashboard_guard.take() {
+            handle.abort();
+        }
 
         // Stop background write task
         let mut handle_guard = self.write_handle.lock().await;

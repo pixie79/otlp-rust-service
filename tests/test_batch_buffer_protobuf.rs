@@ -86,10 +86,10 @@ async fn test_batch_buffer_multiple_metrics_protobuf() {
     for i in 0..5 {
         let mut request = create_test_protobuf_metrics_request();
         // Modify resource to make each unique
-        if let Some(ref mut rm) = request.resource_metrics.first_mut() {
-            if let Some(ref mut resource) = rm.resource {
-                resource.attributes[0].key = format!("service.name.{}", i);
-            }
+        if let Some(ref mut rm) = request.resource_metrics.first_mut()
+            && let Some(ref mut resource) = rm.resource
+        {
+            resource.attributes[0].key = format!("service.name.{}", i);
         }
         buffer.add_metrics_protobuf(request).await.unwrap();
     }

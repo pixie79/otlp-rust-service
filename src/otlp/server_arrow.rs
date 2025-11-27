@@ -7,9 +7,9 @@ use crate::error::OtlpError;
 use crate::otlp::OtlpFileExporter;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::{
-    flight_service_server::{FlightService, FlightServiceServer},
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
+    flight_service_server::{FlightService, FlightServiceServer},
 };
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::SpanData;
@@ -153,13 +153,13 @@ impl FlightService for OtlpFlightServiceImpl {
                 // For now, we'll try to convert to both and see which succeeds
                 for batch in batches {
                     // Try to convert to traces
-                    if let Ok(spans) = convert_arrow_batch_to_spans(&batch) {
-                        if !spans.is_empty() {
-                            if let Err(e) = file_exporter.export_traces(spans).await {
-                                error!("Failed to export traces from Arrow Flight: {}", e);
-                            }
-                            continue;
+                    if let Ok(spans) = convert_arrow_batch_to_spans(&batch)
+                        && !spans.is_empty()
+                    {
+                        if let Err(e) = file_exporter.export_traces(spans).await {
+                            error!("Failed to export traces from Arrow Flight: {}", e);
                         }
+                        continue;
                     }
 
                     // Try to convert to metrics
@@ -168,24 +168,26 @@ impl FlightService for OtlpFlightServiceImpl {
                     if let Ok(Some(protobuf_request)) =
                         converter.arrow_flight_to_protobuf_metrics(&batch)
                     {
-                        // Convert protobuf to ResourceMetrics for export
-                        if let Ok(Some(metrics)) =
-                            crate::otlp::server::convert_metrics_request_to_resource_metrics(
-                                &protobuf_request,
-                            )
+                        // Export directly from protobuf (no ResourceMetrics conversion needed)
+                        if let Err(e) = file_exporter
+                            .export_metrics_from_protobuf(&protobuf_request)
+                            .await
                         {
-                            if let Err(e) = file_exporter.export_metrics(&metrics).await {
-                                error!("Failed to export metrics from Arrow Flight: {}", e);
-                            }
+                            error!("Failed to export metrics from Arrow Flight: {}", e);
                         }
                         continue;
                     }
 
-                    // Fallback: try direct conversion (for backward compatibility)
-                    if let Ok(Some(metrics)) = convert_arrow_batch_to_resource_metrics(&batch) {
-                        if let Err(e) = file_exporter.export_metrics(&metrics).await {
-                            error!("Failed to export metrics from Arrow Flight: {}", e);
-                        }
+                    // Fallback: try direct conversion to ResourceMetrics
+                    // Note: ResourceMetrics has private fields, so we can't convert it directly
+                    // This path is not fully implemented - Arrow Flight metrics should be
+                    // converted to Protobuf format instead
+                    if let Ok(Some(_metrics)) = convert_arrow_batch_to_resource_metrics(&batch) {
+                        // ResourceMetrics conversion is not supported without proxy
+                        // Arrow Flight metrics should be handled via Protobuf conversion path
+                        warn!(
+                            "Arrow Flight metrics conversion to ResourceMetrics not fully supported - use Protobuf path"
+                        );
                         continue;
                     }
 
@@ -252,10 +254,10 @@ pub(crate) fn convert_arrow_batch_to_spans(
     batch: &RecordBatch,
 ) -> Result<Vec<SpanData>, anyhow::Error> {
     use arrow::array::*;
+    use opentelemetry::KeyValue;
     use opentelemetry::trace::{
         SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
     };
-    use opentelemetry::KeyValue;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     let schema = batch.schema();
@@ -592,33 +594,32 @@ pub(crate) fn convert_arrow_batch_to_resource_metrics(
     // Preserved for future use when ResourceMetrics construction is available
     let _resource_attrs = {
         let mut attrs = vec![];
-        if let Some((idx, _)) = attributes_idx {
-            if let Some(string_array) = batch.column(idx).as_any().downcast_ref::<StringArray>() {
-                if string_array.is_valid(0) {
-                    let json_str = string_array.value(0);
-                    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(json_str) {
-                        if let Some(obj) = json_value.as_object() {
-                            for (k, v) in obj.iter() {
-                                let value = match v {
-                                    serde_json::Value::String(s) => {
-                                        opentelemetry::Value::String(s.clone().into())
-                                    }
-                                    serde_json::Value::Number(n) => {
-                                        if let Some(i) = n.as_i64() {
-                                            opentelemetry::Value::I64(i)
-                                        } else if let Some(f) = n.as_f64() {
-                                            opentelemetry::Value::F64(f)
-                                        } else {
-                                            opentelemetry::Value::String(n.to_string().into())
-                                        }
-                                    }
-                                    serde_json::Value::Bool(b) => opentelemetry::Value::Bool(*b),
-                                    _ => opentelemetry::Value::String(v.to_string().into()),
-                                };
-                                attrs.push(KeyValue::new(k.clone(), value));
+        if let Some((idx, _)) = attributes_idx
+            && let Some(string_array) = batch.column(idx).as_any().downcast_ref::<StringArray>()
+            && string_array.is_valid(0)
+        {
+            let json_str = string_array.value(0);
+            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(json_str)
+                && let Some(obj) = json_value.as_object()
+            {
+                for (k, v) in obj.iter() {
+                    let value = match v {
+                        serde_json::Value::String(s) => {
+                            opentelemetry::Value::String(s.clone().into())
+                        }
+                        serde_json::Value::Number(n) => {
+                            if let Some(i) = n.as_i64() {
+                                opentelemetry::Value::I64(i)
+                            } else if let Some(f) = n.as_f64() {
+                                opentelemetry::Value::F64(f)
+                            } else {
+                                opentelemetry::Value::String(n.to_string().into())
                             }
                         }
-                    }
+                        serde_json::Value::Bool(b) => opentelemetry::Value::Bool(*b),
+                        _ => opentelemetry::Value::String(v.to_string().into()),
+                    };
+                    attrs.push(KeyValue::new(k.clone(), value));
                 }
             }
         }

@@ -102,7 +102,9 @@ write_interval_secs: 10
     fs::write(&config_file, yaml_content).unwrap();
     
     // Set environment variable to override YAML
-    std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "15");
+    unsafe {
+        std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "15");
+    }
     
     let config = ConfigLoader::from_yaml(&config_file).unwrap();
     
@@ -110,7 +112,9 @@ write_interval_secs: 10
     assert_eq!(config.write_interval_secs, 15);
     
     // Clean up
-    std::env::remove_var("OTLP_WRITE_INTERVAL_SECS");
+    unsafe {
+        std::env::remove_var("OTLP_WRITE_INTERVAL_SECS");
+    }
 }
 
 #[test]

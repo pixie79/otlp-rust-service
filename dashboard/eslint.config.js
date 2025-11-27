@@ -5,6 +5,9 @@ export default [
   js.configs.recommended,
   prettier,
   {
+    ignores: ['dist/**', 'node_modules/**', '**/*.min.js', 'coverage/**'],
+  },
+  {
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -42,6 +45,22 @@ export default [
         Event: 'readonly',
         KeyboardEvent: 'readonly',
         MouseEvent: 'readonly',
+        fetch: 'readonly',
+        table: 'readonly',
+        ReadableStream: 'readonly',
+        WritableStream: 'readonly',
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
+        AsyncIterator: 'readonly',
+        HTMLImageElement: 'readonly',
+        HTMLCanvasElement: 'readonly',
+        HTMLVideoElement: 'readonly',
+        ImageData: 'readonly',
+        Image: 'readonly',
+        AbortController: 'readonly',
+        requestAnimationFrame: 'readonly',
+        cancelAnimationFrame: 'readonly',
+        matchMedia: 'readonly',
       },
     },
     rules: {
@@ -49,7 +68,7 @@ export default [
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',
       'no-var': 'error',
+      'no-prototype-builtins': 'off',
     },
-    ignores: ['dist/', 'node_modules/', '*.min.js', 'coverage/'],
   },
 ];

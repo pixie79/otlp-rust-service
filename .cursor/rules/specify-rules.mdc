@@ -7,6 +7,8 @@ Auto-generated from all feature plans. Last updated: 2025-11-23
 - Rust stable (latest), Python 3.11+ (001-otlp-arrow-library)
 - Rust 1.75+ (stable channel, latest stable) (003-opentelemetry-exporters)
 - N/A (exporters delegate to existing `OtlpLibrary` file storage) (003-opentelemetry-exporters)
+- Rust 1.75+ (stable channel, edition 2021) (005-demo-app)
+- Local filesystem (Arrow IPC format files in output directory) (005-demo-app)
 
 - Rust stable channel (latest stable, minimum 1.75+) (001-otlp-arrow-library)
 
@@ -26,9 +28,9 @@ cargo test [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECH
 Rust stable channel (latest stable, minimum 1.75+): Follow standard conventions
 
 ## Recent Changes
+- 005-demo-app: Added Rust 1.75+ (stable channel, edition 2021)
 - 003-opentelemetry-exporters: Added Rust 1.75+ (stable channel, latest stable)
 - 001-otlp-arrow-library: Added Rust stable (latest), Python 3.11+
-- 001-otlp-arrow-library: Added Rust stable channel (latest stable, minimum 1.75+)
 
 
 <!-- MANUAL ADDITIONS START -->

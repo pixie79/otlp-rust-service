@@ -10,17 +10,19 @@ static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 /// Helper function to clear all OTLP-related environment variables
 fn clear_otlp_env_vars() {
-    std::env::remove_var("OTLP_OUTPUT_DIR");
-    std::env::remove_var("OTLP_WRITE_INTERVAL_SECS");
-    std::env::remove_var("OTLP_TRACE_CLEANUP_INTERVAL_SECS");
-    std::env::remove_var("OTLP_METRIC_CLEANUP_INTERVAL_SECS");
-    std::env::remove_var("OTLP_PROTOBUF_ENABLED");
-    std::env::remove_var("OTLP_PROTOBUF_PORT");
-    std::env::remove_var("OTLP_ARROW_FLIGHT_ENABLED");
-    std::env::remove_var("OTLP_ARROW_FLIGHT_PORT");
-    std::env::remove_var("OTLP_FORWARDING_ENABLED");
-    std::env::remove_var("OTLP_FORWARDING_ENDPOINT_URL");
-    std::env::remove_var("OTLP_FORWARDING_PROTOCOL");
+    unsafe {
+        std::env::remove_var("OTLP_OUTPUT_DIR");
+        std::env::remove_var("OTLP_WRITE_INTERVAL_SECS");
+        std::env::remove_var("OTLP_TRACE_CLEANUP_INTERVAL_SECS");
+        std::env::remove_var("OTLP_METRIC_CLEANUP_INTERVAL_SECS");
+        std::env::remove_var("OTLP_PROTOBUF_ENABLED");
+        std::env::remove_var("OTLP_PROTOBUF_PORT");
+        std::env::remove_var("OTLP_ARROW_FLIGHT_ENABLED");
+        std::env::remove_var("OTLP_ARROW_FLIGHT_PORT");
+        std::env::remove_var("OTLP_FORWARDING_ENABLED");
+        std::env::remove_var("OTLP_FORWARDING_ENDPOINT_URL");
+        std::env::remove_var("OTLP_FORWARDING_PROTOCOL");
+    }
 }
 
 #[test]
@@ -28,14 +30,16 @@ fn test_load_from_env_with_all_vars() {
     let _guard = ENV_MUTEX.lock().unwrap();
     clear_otlp_env_vars();
 
-    std::env::set_var("OTLP_OUTPUT_DIR", "/tmp/env_test");
-    std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "20");
-    std::env::set_var("OTLP_TRACE_CLEANUP_INTERVAL_SECS", "400");
-    std::env::set_var("OTLP_METRIC_CLEANUP_INTERVAL_SECS", "2000");
-    std::env::set_var("OTLP_PROTOBUF_ENABLED", "true");
-    std::env::set_var("OTLP_PROTOBUF_PORT", "4319");
-    std::env::set_var("OTLP_ARROW_FLIGHT_ENABLED", "false");
-    std::env::set_var("OTLP_ARROW_FLIGHT_PORT", "4320");
+    unsafe {
+        std::env::set_var("OTLP_OUTPUT_DIR", "/tmp/env_test");
+        std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "20");
+        std::env::set_var("OTLP_TRACE_CLEANUP_INTERVAL_SECS", "400");
+        std::env::set_var("OTLP_METRIC_CLEANUP_INTERVAL_SECS", "2000");
+        std::env::set_var("OTLP_PROTOBUF_ENABLED", "true");
+        std::env::set_var("OTLP_PROTOBUF_PORT", "4319");
+        std::env::set_var("OTLP_ARROW_FLIGHT_ENABLED", "false");
+        std::env::set_var("OTLP_ARROW_FLIGHT_PORT", "4320");
+    }
 
     let config = ConfigLoader::from_env().unwrap();
 
@@ -57,7 +61,9 @@ fn test_load_from_env_with_defaults() {
     clear_otlp_env_vars();
 
     // Only set output_dir, others should use defaults
-    std::env::set_var("OTLP_OUTPUT_DIR", "/tmp/env_defaults");
+    unsafe {
+        std::env::set_var("OTLP_OUTPUT_DIR", "/tmp/env_defaults");
+    }
 
     let config = ConfigLoader::from_env().unwrap();
 
@@ -77,8 +83,10 @@ fn test_load_from_env_with_invalid_values() {
     clear_otlp_env_vars();
 
     // Set invalid values that should be ignored
-    std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "not_a_number");
-    std::env::set_var("OTLP_PROTOBUF_PORT", "99999"); // Invalid port
+    unsafe {
+        std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "not_a_number");
+        std::env::set_var("OTLP_PROTOBUF_PORT", "99999"); // Invalid port
+    }
 
     let config = ConfigLoader::from_env();
 
@@ -94,10 +102,12 @@ fn test_load_from_env_with_forwarding() {
     let _guard = ENV_MUTEX.lock().unwrap();
     clear_otlp_env_vars();
 
-    std::env::set_var("OTLP_OUTPUT_DIR", "/tmp/env_forwarding");
-    std::env::set_var("OTLP_FORWARDING_ENABLED", "true");
-    std::env::set_var("OTLP_FORWARDING_ENDPOINT_URL", "https://example.com/otlp");
-    std::env::set_var("OTLP_FORWARDING_PROTOCOL", "arrow_flight");
+    unsafe {
+        std::env::set_var("OTLP_OUTPUT_DIR", "/tmp/env_forwarding");
+        std::env::set_var("OTLP_FORWARDING_ENABLED", "true");
+        std::env::set_var("OTLP_FORWARDING_ENDPOINT_URL", "https://example.com/otlp");
+        std::env::set_var("OTLP_FORWARDING_PROTOCOL", "arrow_flight");
+    }
 
     let config = ConfigLoader::from_env().unwrap();
 
@@ -130,7 +140,9 @@ fn test_env_var_priority_over_provided_config() {
         .unwrap();
 
     // Set environment variable
-    std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "25");
+    unsafe {
+        std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "25");
+    }
 
     // Load with provided config - env should override
     let config = ConfigLoader::load(Some(provided_config)).unwrap();
