@@ -5,20 +5,20 @@
 use crate::error::OtlpError;
 use crate::otlp::OtlpFileExporter;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
-    metrics_service_server::{MetricsService, MetricsServiceServer},
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+    metrics_service_server::{MetricsService, MetricsServiceServer},
 };
 use opentelemetry_proto::tonic::collector::trace::v1::{
-    trace_service_server::{TraceService, TraceServiceServer},
     ExportTraceServiceRequest, ExportTraceServiceResponse,
+    trace_service_server::{TraceService, TraceServiceServer},
 };
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::SpanData;
 use std::sync::Arc;
-use tonic::transport::Server;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
+use tonic::transport::Server;
 use tracing::{error, info};
 
 /// gRPC server for OTLP messages
@@ -92,6 +92,77 @@ impl TraceService for TraceServiceImpl {
     }
 }
 
+/// Helper function to create a temporary metrics server for extraction
+///
+/// This creates a temporary gRPC server that can capture ExportMetricsServiceRequest.
+/// Used by the metrics extraction function to convert ResourceMetrics to protobuf.
+pub(crate) async fn create_temporary_metrics_server(
+    capture_tx: tokio::sync::oneshot::Sender<ExportMetricsServiceRequest>,
+) -> Result<(tokio::task::JoinHandle<()>, String), anyhow::Error> {
+    use opentelemetry_proto::tonic::collector::metrics::v1::metrics_service_server::{
+        MetricsService, MetricsServiceServer,
+    };
+    use std::sync::Arc;
+    use tonic::{Request, Response, Status};
+
+    // Create a capture service that reuses the same pattern as MetricsServiceImpl
+    struct CaptureMetricsService {
+        tx: Arc<
+            tokio::sync::Mutex<Option<tokio::sync::oneshot::Sender<ExportMetricsServiceRequest>>>,
+        >,
+    }
+
+    #[tonic::async_trait]
+    impl MetricsService for CaptureMetricsService {
+        async fn export(
+            &self,
+            request: Request<ExportMetricsServiceRequest>,
+        ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
+            let req = request.into_inner();
+
+            // Send the captured request
+            if let Some(sender) = self.tx.lock().await.take() {
+                let _ = sender.send(req.clone());
+            }
+
+            Ok(Response::new(ExportMetricsServiceResponse {
+                partial_success: None,
+            }))
+        }
+    }
+
+    // Find an available port using tokio::net::TcpListener
+    // This must be called from within a Tokio runtime context
+    // If we're not in a runtime, we need to spawn the server creation in a task
+    // that has access to a runtime (the library's main runtime)
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to bind to port: {}", e))?;
+    let addr = listener
+        .local_addr()
+        .map_err(|e| anyhow::anyhow!("Failed to get local address: {}", e))?;
+    let addr_str = format!("http://{}", addr);
+
+    // Create the capture service
+    let capture_service = CaptureMetricsService {
+        tx: Arc::new(tokio::sync::Mutex::new(Some(capture_tx))),
+    };
+
+    // Start the temporary server in a background task
+    let server_handle = tokio::spawn(async move {
+        let server = Server::builder()
+            .add_service(MetricsServiceServer::new(capture_service))
+            .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+            .await;
+
+        if let Err(e) = server {
+            tracing::error!("Temporary gRPC server error: {}", e);
+        }
+    });
+
+    Ok((server_handle, addr_str))
+}
+
 /// Metrics service implementation
 #[derive(Debug, Clone)]
 pub struct MetricsServiceImpl {
@@ -106,17 +177,12 @@ impl MetricsService for MetricsServiceImpl {
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
         let req = request.into_inner();
 
-        // Convert OTLP protobuf to ResourceMetrics for export
-        // Note: We preserve the original protobuf request for potential forwarding
-        let resource_metrics = convert_metrics_request_to_resource_metrics(&req)
-            .map_err(|e| Status::internal(format!("Failed to convert metrics: {}", e)))?;
-
-        if let Some(metrics) = resource_metrics {
-            // Export metrics using the file exporter directly
-            if let Err(e) = self.file_exporter.export_metrics(&metrics).await {
-                error!("Failed to export metrics: {}", e);
-                return Err(Status::internal(format!("Failed to export metrics: {}", e)));
-            }
+        // As an OpenTelemetry endpoint, we receive Protobuf (ExportMetricsServiceRequest) directly via gRPC.
+        // We don't receive ResourceMetrics - that's an SDK-internal structure that only exists in the client.
+        // So we can convert Protobuf → InternalResourceMetrics → Arrow directly (NO PROXY NEEDED!)
+        if let Err(e) = self.file_exporter.export_metrics_from_protobuf(&req).await {
+            error!("Failed to export metrics: {}", e);
+            return Err(Status::internal(format!("Failed to export metrics: {}", e)));
         }
 
         Ok(Response::new(ExportMetricsServiceResponse {
@@ -130,10 +196,10 @@ impl MetricsService for MetricsServiceImpl {
 pub(crate) fn convert_trace_request_to_spans(
     req: &ExportTraceServiceRequest,
 ) -> Result<Vec<SpanData>, anyhow::Error> {
+    use opentelemetry::KeyValue;
     use opentelemetry::trace::{
         SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
     };
-    use opentelemetry::KeyValue;
     use std::time::{Duration, UNIX_EPOCH};
 
     let mut spans = Vec::new();

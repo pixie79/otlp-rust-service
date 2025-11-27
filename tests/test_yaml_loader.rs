@@ -13,17 +13,19 @@ static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 /// Helper function to clear all OTLP-related environment variables
 fn clear_otlp_env_vars() {
-    std::env::remove_var("OTLP_OUTPUT_DIR");
-    std::env::remove_var("OTLP_WRITE_INTERVAL_SECS");
-    std::env::remove_var("OTLP_TRACE_CLEANUP_INTERVAL_SECS");
-    std::env::remove_var("OTLP_METRIC_CLEANUP_INTERVAL_SECS");
-    std::env::remove_var("OTLP_PROTOBUF_ENABLED");
-    std::env::remove_var("OTLP_PROTOBUF_PORT");
-    std::env::remove_var("OTLP_ARROW_FLIGHT_ENABLED");
-    std::env::remove_var("OTLP_ARROW_FLIGHT_PORT");
-    std::env::remove_var("OTLP_FORWARDING_ENABLED");
-    std::env::remove_var("OTLP_FORWARDING_ENDPOINT_URL");
-    std::env::remove_var("OTLP_FORWARDING_PROTOCOL");
+    unsafe {
+        std::env::remove_var("OTLP_OUTPUT_DIR");
+        std::env::remove_var("OTLP_WRITE_INTERVAL_SECS");
+        std::env::remove_var("OTLP_TRACE_CLEANUP_INTERVAL_SECS");
+        std::env::remove_var("OTLP_METRIC_CLEANUP_INTERVAL_SECS");
+        std::env::remove_var("OTLP_PROTOBUF_ENABLED");
+        std::env::remove_var("OTLP_PROTOBUF_PORT");
+        std::env::remove_var("OTLP_ARROW_FLIGHT_ENABLED");
+        std::env::remove_var("OTLP_ARROW_FLIGHT_PORT");
+        std::env::remove_var("OTLP_FORWARDING_ENABLED");
+        std::env::remove_var("OTLP_FORWARDING_ENDPOINT_URL");
+        std::env::remove_var("OTLP_FORWARDING_PROTOCOL");
+    }
 }
 
 #[test]
@@ -134,7 +136,9 @@ write_interval_secs: 10
     fs::write(&config_file, yaml_content).unwrap();
 
     // Set environment variable to override YAML
-    std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "15");
+    unsafe {
+        std::env::set_var("OTLP_WRITE_INTERVAL_SECS", "15");
+    }
 
     let config = ConfigLoader::from_yaml(&config_file).unwrap();
 
@@ -142,7 +146,9 @@ write_interval_secs: 10
     assert_eq!(config.write_interval_secs, 15);
 
     // Clean up
-    std::env::remove_var("OTLP_WRITE_INTERVAL_SECS");
+    unsafe {
+        std::env::remove_var("OTLP_WRITE_INTERVAL_SECS");
+    }
 }
 
 #[test]

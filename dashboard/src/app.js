@@ -15,6 +15,7 @@ import { Loading } from './ui/loading.js';
 import { Search } from './ui/search.js';
 import { TimeRangeSelector } from './ui/time-range-selector.js';
 import { Settings } from './ui/settings.js';
+import { SQLTerminal } from './ui/sql-terminal.js';
 
 // Status badge helper function (currently unused, kept for potential future use)
 // const statusBadge = (text) => `<span class="status-badge">${text}</span>`;
@@ -118,20 +119,38 @@ export class App {
     this._attachKeyboardHandlers();
     this._instantiateTraceComponents();
     this._instantiateMetricComponents();
+    this._instantiateSQLTerminal();
 
     await this.workerClient.init();
+
+    // Clear state on initialization to ensure clean state after page refresh/restart
+    this.state.tables.clear();
+    if (this.fileWatcher) {
+      this.fileWatcher.clearCache();
+      // Clear known files to force re-detection
+      this.fileWatcher.knownFiles?.clear();
+    }
+
     this.traceQuery = new TraceQuery({
       execute: async (sql, params) => {
         const result = await this.workerClient.query(sql, params);
         return { rows: result.rows ?? [] };
       },
     });
+    // Set callback to clean up missing tables from state
+    this.traceQuery.onTableMissing = (tableNames) => {
+      this._removeMissingTables(tableNames);
+    };
     this.metricQuery = new MetricQuery({
       execute: async (sql, params) => {
         const result = await this.workerClient.query(sql, params);
         return { rows: result.rows ?? [] };
       },
     });
+    // Set callback to clean up missing tables from state
+    this.metricQuery.onTableMissing = (tableNames) => {
+      this._removeMissingTables(tableNames);
+    };
 
     // Restore paused state
     if (this.isPaused) {
@@ -175,9 +194,15 @@ export class App {
       this._ingestFile(fileHandle, metadata);
     };
 
-    this.fileWatcher.onFileChanged = (fileHandle, metadata) => {
-      this._log(`Detected modified file: ${metadata?.name ?? fileHandle.name}`);
-      this._ingestFile(fileHandle, metadata);
+    this.fileWatcher.onFileChanged = async (fileHandle, metadata) => {
+      const fileName = metadata?.name ?? fileHandle.name ?? 'unknown';
+      this._log(`Detected modified file: ${fileName} (size: ${metadata?.size ?? 'unknown'} bytes)`);
+
+      // Small delay to ensure file write is complete before reading
+      // This is especially important for streaming Arrow files that are being actively written to
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      await this._ingestFile(fileHandle, metadata);
     };
   }
 
@@ -194,8 +219,13 @@ export class App {
 
     if (view === 'traces') {
       this._refreshTraces();
-    } else {
+    } else if (view === 'metrics') {
       this._refreshMetrics();
+    } else if (view === 'sql') {
+      // SQL terminal doesn't need refresh, it's user-driven
+      if (this.sqlTerminal) {
+        this.sqlTerminal.refreshTableList();
+      }
     }
   }
 
@@ -203,6 +233,30 @@ export class App {
     try {
       this._setStatus('Awaiting permission…');
       const directory = await this.fileReader.selectDirectory();
+
+      // Clear all tables and state when selecting a new directory
+      // This ensures a fresh start when switching directories
+      this._log('Clearing existing data...');
+
+      // Only clear tables if DuckDB is initialized
+      // If not initialized yet, just clear local state
+      try {
+        await this.workerClient.clearTables();
+      } catch (clearError) {
+        // DuckDB might not be initialized yet - that's OK, just clear local state
+        if (clearError.message && clearError.message.includes('not initialized')) {
+          this._log('DuckDB not initialized yet, skipping table clear');
+        } else {
+          throw clearError;
+        }
+      }
+
+      this.state.tables.clear();
+      if (this.fileWatcher) {
+        this.fileWatcher.clearCache();
+      }
+      this._log('Data cleared. Starting fresh...');
+
       this.state.directory = directory;
       this._setStatus('Watching for updates');
       this._log('Directory access granted. Starting watcher…');
@@ -217,36 +271,51 @@ export class App {
 
   async _ingestFile(fileHandle, metadata) {
     try {
-      const name = metadata?.name ?? fileHandle.name ?? 'unknown.arrow';
+      const name = metadata?.name ?? fileHandle.name ?? 'unknown.arrows';
 
-      // Check file size and use appropriate reading strategy
-      const fileMetadata = await this.fileReader.getFileMetadata(fileHandle);
-      const fileSizeMB = fileMetadata.size / (1024 * 1024);
+      // Check if this file is already registered (might be an update)
+      const existingTableName = this.state.tables.get(name);
+      const isUpdate = existingTableName !== undefined;
 
-      if (fileSizeMB > 50) {
-        this._log(
-          `Reading large file ${name} (${fileSizeMB.toFixed(2)}MB) - this may take a moment...`
-        );
-      }
-
-      // Read file with chunked reading for large files
+      // For local files (File System Access API), read the buffer directly
+      // For files served by the server, we can use fileURL
+      // Since we're using File System Access API, we'll read the buffer directly
+      // Always get fresh file data, especially important for files being actively written to
       const buffer = await this.fileReader.readFile(fileHandle, name, {
         chunkSize: 10 * 1024 * 1024, // 10MB chunks
         maxSize: 200 * 1024 * 1024, // 200MB max
       });
 
+      console.warn(
+        `[App] Ingesting ${isUpdate ? 'updated' : 'new'} file: ${name}, size: ${buffer.byteLength} bytes`
+      );
+
       const { tableName } = await this.workerClient.registerFile(name, buffer);
       this.state.tables.set(name, tableName);
-      this._log(`Registered ${name} as ${tableName} in DuckDB.`);
 
-      // Check if we need to clean up old tables
-      const maxFiles = configManager.get('maxLoadedFiles');
-      if (this.state.tables.size > maxFiles) {
-        await this._cleanupOldTables(maxFiles);
+      if (isUpdate) {
+        this._log(
+          `Updated ${name} as ${tableName} in DuckDB (${(buffer.byteLength / 1024).toFixed(2)} KB).`
+        );
+      } else {
+        this._log(
+          `Registered ${name} as ${tableName} in DuckDB (${(buffer.byteLength / 1024).toFixed(2)} KB).`
+        );
       }
 
-      await this._refreshTraces();
+      // Don't proactively clean up tables - let DuckDB's LRU eviction handle it
+      // This prevents removing tables that are actively being written to
+      // The DuckDB client's eviction logic is smarter and respects grace periods
+
+      // Refresh data views - use append mode if live tail is enabled
+      const isLiveTail = this.traceList?.liveTailEnabled ?? false;
+      await this._refreshTraces(isLiveTail && isUpdate);
       await this._refreshMetrics();
+
+      // Refresh SQL terminal table list if it exists
+      if (this.sqlTerminal) {
+        this.sqlTerminal.refreshTableList();
+      }
     } catch (error) {
       console.error('Failed to ingest file', error);
       const errorMessage = error.message || 'Unknown error';
@@ -287,6 +356,22 @@ export class App {
     }
   }
 
+  /**
+   * Remove missing tables from state (e.g., evicted tables)
+   * @private
+   */
+  _removeMissingTables(tableNames) {
+    for (const tableName of tableNames) {
+      // Find fileName(s) that map to this tableName
+      for (const [fileName, mappedTableName] of this.state.tables.entries()) {
+        if (mappedTableName === tableName) {
+          this.state.tables.delete(fileName);
+          this._log(`Removed missing table from state: ${fileName} (${tableName})`);
+        }
+      }
+    }
+  }
+
   _setStatus(statusText) {
     this.state.status = statusText;
     if (this.layout) {
@@ -315,7 +400,15 @@ export class App {
     this.traceFilter.onChange = (filters) => {
       this.activeFilters = filters;
       this.traceList.applyFilters(filters);
-      this._refreshTraces();
+      if (!filters.liveTail) {
+        this._refreshTraces();
+      }
+    };
+
+    this.traceFilter.onLiveTailToggle = (enabled) => {
+      this.traceList.toggleLiveTail(enabled, () => {
+        this._refreshTraces(true);
+      });
     };
 
     this.traceFilter.setFilters(this.activeFilters);
@@ -325,24 +418,40 @@ export class App {
     this.traceList.bindWorker(this.workerClient);
   }
 
-  async _refreshTraces() {
+  async _refreshTraces(append = false) {
     if (!this.traceQuery || !this.state.tables.size) {
+      console.warn('[App] _refreshTraces: No traceQuery or tables available');
       return;
     }
     const tableNames = Array.from(this.state.tables.values());
+    console.warn(`[App] _refreshTraces: Querying ${tableNames.length} tables, append=${append}`);
     try {
       const traces = await this.traceQuery.fetchLatestFromTables(tableNames, {
         ...this.activeFilters,
         limit: configManager.get('maxTraces'),
       });
-      this.workerClient.publish('TRACE_BATCH', { traces });
+
+      console.warn(`[App] _refreshTraces: Fetched ${traces.length} traces`);
+
+      if (append) {
+        // For live tail: append new traces
+        console.warn('[App] _refreshTraces: Publishing TRACE_BATCH_APPEND');
+        this.workerClient.publish('TRACE_BATCH_APPEND', { traces });
+      } else {
+        // Normal refresh: replace all traces
+        console.warn('[App] _refreshTraces: Publishing TRACE_BATCH');
+        this.workerClient.publish('TRACE_BATCH', { traces });
+      }
 
       if ((this.traceList.filteredTraces ?? []).length === 0) {
         this.traceDetail.clear();
       }
     } catch (error) {
-      console.error('Failed to refresh traces', error);
-      this._log(`Trace refresh failed: ${error.message}`);
+      console.error('[App] Failed to refresh traces', error);
+      // Only log error if it's not a missing table error (those are handled gracefully)
+      if (!error.message?.includes('does not exist')) {
+        this._log(`Trace refresh failed: ${error.message}`);
+      }
     }
   }
 
@@ -362,6 +471,28 @@ export class App {
     const graphsContainer = document.getElementById('metric-graphs-container');
     if (graphsContainer) {
       this.metricGraphsContainer = graphsContainer;
+    }
+  }
+
+  _instantiateSQLTerminal() {
+    const container = this.root.querySelector('#sql-terminal-container');
+    if (container) {
+      // Create query executor for SQL terminal
+      const queryExecutor = {
+        execute: async (sql, params) => {
+          const result = await this.workerClient.query(sql, params);
+          return { rows: result.rows ?? [] };
+        },
+      };
+
+      this.sqlTerminal = new SQLTerminal(container, {
+        queryExecutor,
+        onQueryResult: (result) => {
+          // Optional: log query results
+          console.warn('SQL query executed:', result);
+        },
+      });
+      this.sqlTerminal.render();
     }
   }
 

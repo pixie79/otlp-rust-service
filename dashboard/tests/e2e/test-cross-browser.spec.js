@@ -63,5 +63,55 @@ for (const browser of browsers) {
       const metricPanel = page.getByRole('tabpanel', { name: /metrics/i });
       await expect(metricPanel).toBeVisible();
     });
+
+    test('should load WASM files with correct MIME type', async ({ page }) => {
+      await page.goto('http://localhost:8080');
+
+      // Wait for page to load and check for WASM file requests
+      const wasmRequests = [];
+      page.on('response', (response) => {
+        const url = response.url();
+        if (url.includes('.wasm')) {
+          wasmRequests.push({
+            url,
+            contentType: response.headers()['content-type'],
+            status: response.status(),
+          });
+        }
+      });
+
+      // Wait a bit for any WASM files to be requested
+      await page.waitForTimeout(2000);
+
+      // If WASM files were requested, verify they have correct content type
+      if (wasmRequests.length > 0) {
+        for (const req of wasmRequests) {
+          expect(req.status).toBe(200);
+          expect(req.contentType).toContain('application/wasm');
+        }
+      }
+    });
+
+    test('should initialize DuckDB worker without errors', async ({ page }) => {
+      await page.goto('http://localhost:8080');
+
+      // Listen for console errors
+      const errors = [];
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') {
+          errors.push(msg.text());
+        }
+      });
+
+      // Wait for worker initialization (app calls workerClient.init() on startup)
+      await page.waitForTimeout(3000);
+
+      // Check that there are no DuckDB initialization errors
+      const duckdbErrors = errors.filter(
+        (e) => e.includes('DuckDB') || e.includes('WebAssembly') || e.includes('WASM')
+      );
+
+      expect(duckdbErrors).toHaveLength(0);
+    });
   });
 }

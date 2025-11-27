@@ -171,7 +171,9 @@ impl FormatConverter {
 
         // For now, we create a minimal request
         // A full implementation would need to properly group spans by resource and scope
-        warn!("Arrow Flight to Protobuf trace conversion: Simplified implementation - full metadata reconstruction not yet implemented");
+        warn!(
+            "Arrow Flight to Protobuf trace conversion: Simplified implementation - full metadata reconstruction not yet implemented"
+        );
 
         // TODO: Properly reconstruct ResourceSpans from spans with resource and scope information
         // This requires tracking resource and scope metadata during conversion
@@ -221,7 +223,9 @@ impl FormatConverter {
         // The Arrow data is preserved when written to file, but protobuf reconstruction is simplified
         let request = ExportMetricsServiceRequest::default();
 
-        warn!("Arrow Flight to Protobuf metrics conversion: Using minimal request due to ResourceMetrics private fields. Arrow data is preserved in file format.");
+        warn!(
+            "Arrow Flight to Protobuf metrics conversion: Using minimal request due to ResourceMetrics private fields. Arrow data is preserved in file format."
+        );
 
         Ok(Some(request))
     }
@@ -241,7 +245,9 @@ impl FormatConverter {
         // Full implementation would properly group spans by resource and scope
         let request = ExportTraceServiceRequest::default();
 
-        warn!("Spans to Protobuf conversion: Simplified implementation - full metadata reconstruction not yet implemented");
+        warn!(
+            "Spans to Protobuf conversion: Simplified implementation - full metadata reconstruction not yet implemented"
+        );
 
         Ok(Some(request))
     }
@@ -272,7 +278,9 @@ impl FormatConverter {
         // In production, metrics from gRPC should preserve the original protobuf request
         let request = ExportMetricsServiceRequest::default();
 
-        warn!("ResourceMetrics to Protobuf conversion: Using minimal request due to ResourceMetrics private fields in opentelemetry-sdk 0.31. Original protobuf requests should be preserved when available.");
+        warn!(
+            "ResourceMetrics to Protobuf conversion: Using minimal request due to ResourceMetrics private fields in opentelemetry-sdk 0.31. Original protobuf requests should be preserved when available."
+        );
 
         Ok(Some(request))
     }
@@ -428,8 +436,8 @@ impl FormatConverter {
 
         // Since ResourceMetrics fields are private, we create a minimal empty batch
         let _ = _metrics; // Acknowledge parameter for future use
-                          // Full implementation would require proper access to metrics data
-                          // This is a placeholder that creates the correct schema structure
+        // Full implementation would require proper access to metrics data
+        // This is a placeholder that creates the correct schema structure
         let schema = Schema::new(vec![
             Field::new("metric_name", DataType::Utf8, false),
             Field::new("value", DataType::Float64, false),

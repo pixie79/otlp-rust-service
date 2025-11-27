@@ -43,3 +43,9 @@ tarpaulin-report.html
 # Build artifacts
 Cargo.lock
 
+dashboard/node_modules/
+dashboard/dist/
+dashboard/build/
+dashboard/package-lock.json
+dashboard/package.json
+dashboard/package-lock.json

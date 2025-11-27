@@ -49,7 +49,7 @@ pub use config::{
 };
 pub use error::{OtlpConfigError, OtlpError, OtlpExportError, OtlpServerError};
 pub use mock::service::MockOtlpService;
-pub use otlp::{OtlpMetricExporter, OtlpSpanExporter};
+pub use otlp::OtlpSpanExporter;
 
 // Re-export Python module function for maturin to find
 // This makes the #[pymodule] function accessible at crate root level

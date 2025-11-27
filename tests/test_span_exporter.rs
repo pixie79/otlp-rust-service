@@ -1,7 +1,7 @@
 //! Unit tests for OtlpSpanExporter
 
-use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId};
 use opentelemetry::KeyValue;
+use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId};
 use opentelemetry_sdk::trace::{SpanData, SpanExporter};
 use otlp_arrow_library::{Config, OtlpLibrary};
 use std::path::PathBuf;

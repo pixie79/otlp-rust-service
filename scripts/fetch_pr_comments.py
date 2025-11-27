@@ -30,6 +30,7 @@ import re
 import sys
 from datetime import datetime
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -613,6 +614,7 @@ class GitHubPRComments:
         pr_info = data["pr_info"]
         issue_comments = data["issue_comments"]
         review_comments = data["review_comments"]
+        reviews = data.get("reviews", [])
 
         # PR Header
         print(f"\n{'=' * 100}")

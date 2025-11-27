@@ -101,9 +101,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     library.export_traces(spans).await?;
 
-    // Export metrics
-    let metrics = opentelemetry_sdk::metrics::data::ResourceMetrics::default();
-    library.export_metrics(metrics).await?;
+    // Export metrics using export_metrics (Protobuf format)
+    // Note: To export ResourceMetrics, users should convert to Protobuf first using
+    // opentelemetry-otlp exporter, then call export_metrics(protobuf)
+    use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+    let metrics_request = ExportMetricsServiceRequest::default();
+    library.export_metrics(metrics_request).await?;
 
     // Wait a bit for batch writing
     tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;

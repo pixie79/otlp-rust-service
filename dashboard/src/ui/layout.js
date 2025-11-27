@@ -55,6 +55,17 @@ export class Layout {
           >
             Metrics
           </button>
+          <button 
+            class="view-nav__button" 
+            id="nav-sql" 
+            data-view="sql"
+            role="tab"
+            aria-selected="false"
+            aria-controls="sql-panel"
+            tabindex="-1"
+          >
+            SQL Terminal
+          </button>
         </nav>
         <section 
           class="panel trace-panel" 
@@ -94,6 +105,15 @@ export class Layout {
           <div id="metric-time-range" role="group" aria-label="Time range selection"></div>
           <div id="metric-graphs-container" role="group" aria-label="Metric graphs"></div>
         </section>
+        <section 
+          class="panel sql-panel" 
+          id="sql-panel" 
+          style="display: none;"
+          role="tabpanel"
+          aria-labelledby="nav-sql"
+        >
+          <div id="sql-terminal-container"></div>
+        </section>
         <section class="panel muted" id="log-panel" role="log" aria-label="Activity log">
           <h2>Activity</h2>
           <ul id="log-list" role="list"></ul>
@@ -112,24 +132,48 @@ export class Layout {
     const navTraces = this.container.querySelector('#nav-traces');
     const navMetrics = this.container.querySelector('#nav-metrics');
 
+    const sqlPanel = this.container.querySelector('#sql-panel');
+    const navSql = this.container.querySelector('#nav-sql');
+
     if (view === 'traces') {
       tracePanel.style.display = 'block';
       metricPanel.style.display = 'none';
+      sqlPanel.style.display = 'none';
       navTraces?.classList.add('active');
       navMetrics?.classList.remove('active');
+      navSql?.classList.remove('active');
       navTraces?.setAttribute('aria-selected', 'true');
       navMetrics?.setAttribute('aria-selected', 'false');
+      navSql?.setAttribute('aria-selected', 'false');
       navTraces?.setAttribute('tabindex', '0');
       navMetrics?.setAttribute('tabindex', '-1');
-    } else {
+      navSql?.setAttribute('tabindex', '-1');
+    } else if (view === 'metrics') {
       tracePanel.style.display = 'none';
       metricPanel.style.display = 'block';
+      sqlPanel.style.display = 'none';
       navTraces?.classList.remove('active');
       navMetrics?.classList.add('active');
+      navSql?.classList.remove('active');
       navTraces?.setAttribute('aria-selected', 'false');
       navMetrics?.setAttribute('aria-selected', 'true');
+      navSql?.setAttribute('aria-selected', 'false');
       navTraces?.setAttribute('tabindex', '-1');
       navMetrics?.setAttribute('tabindex', '0');
+      navSql?.setAttribute('tabindex', '-1');
+    } else if (view === 'sql') {
+      tracePanel.style.display = 'none';
+      metricPanel.style.display = 'none';
+      sqlPanel.style.display = 'block';
+      navTraces?.classList.remove('active');
+      navMetrics?.classList.remove('active');
+      navSql?.classList.add('active');
+      navTraces?.setAttribute('aria-selected', 'false');
+      navMetrics?.setAttribute('aria-selected', 'false');
+      navSql?.setAttribute('aria-selected', 'true');
+      navTraces?.setAttribute('tabindex', '-1');
+      navMetrics?.setAttribute('tabindex', '-1');
+      navSql?.setAttribute('tabindex', '0');
     }
   }
 
