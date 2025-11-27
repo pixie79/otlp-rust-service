@@ -1,4 +1,4 @@
-//! Integration test for export_metrics_ref end-to-end flow
+//! Integration test for export_metrics_arrow end-to-end flow
 
 use otlp_arrow_library::{Config, OtlpLibrary};
 use opentelemetry::KeyValue;
@@ -18,7 +18,7 @@ fn create_test_metric() -> ResourceMetrics {
 }
 
 #[tokio::test]
-async fn test_export_metrics_ref_end_to_end_flow() {
+async fn test_export_metrics_arrow_end_to_end_flow() {
     // Create a temporary directory for testing
     let temp_dir = TempDir::new().unwrap();
     
@@ -37,7 +37,7 @@ async fn test_export_metrics_ref_end_to_end_flow() {
     
     // Export metrics using reference method
     let metrics = create_test_metric();
-    library.export_metrics_ref(&metrics).await.expect("Failed to export metrics by reference");
+    library.export_metrics_arrow(&metrics).await.expect("Failed to export metrics to Arrow");
     
     // Wait for batch write
     sleep(Duration::from_secs(2)).await;

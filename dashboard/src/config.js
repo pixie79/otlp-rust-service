@@ -5,6 +5,8 @@ const DEFAULT_CONFIG = Object.freeze({
   maxLoadedFiles: 100,
   traceRetentionMinutes: 60,
   metricRetentionMinutes: 60,
+  tableEvictionTimeoutMinutes: 10, // Evict tables after 10 minutes of inactivity
+  tableEvictionMemoryThreshold: 0.95, // Only evict when 95% of max tables reached
 });
 
 const numberGuard = (value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) => {
@@ -45,6 +47,22 @@ const normalizeConfig = (partial) => ({
     {
       min: 1,
       max: 24 * 60,
+    }
+  ),
+  tableEvictionTimeoutMinutes: numberGuard(
+    partial.tableEvictionTimeoutMinutes,
+    DEFAULT_CONFIG.tableEvictionTimeoutMinutes,
+    {
+      min: 1,
+      max: 60,
+    }
+  ),
+  tableEvictionMemoryThreshold: numberGuard(
+    partial.tableEvictionMemoryThreshold,
+    DEFAULT_CONFIG.tableEvictionMemoryThreshold,
+    {
+      min: 0.5,
+      max: 1.0,
     }
   ),
 });

@@ -98,6 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dashboard_handle = if config.dashboard.enabled {
         let dashboard_server = DashboardServer::new(
             config.dashboard.static_dir.clone(),
+            config.output_dir.clone(),
             config.dashboard.port,
             config.dashboard.bind_address.clone(),
         );

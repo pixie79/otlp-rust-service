@@ -41,6 +41,17 @@ export class Navigation {
         >
           Metrics
         </button>
+        <button 
+          class="view-nav__button ${this.currentView === 'sql' ? 'active' : ''}" 
+          id="nav-sql" 
+          data-view="sql"
+          role="tab"
+          aria-selected="${this.currentView === 'sql'}"
+          aria-controls="sql-panel"
+          tabindex="${this.currentView === 'sql' ? '0' : '-1'}"
+        >
+          SQL Terminal
+        </button>
       </nav>
     `;
 

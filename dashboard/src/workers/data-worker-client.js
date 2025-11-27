@@ -36,12 +36,23 @@ export class DataWorkerClient {
     return this._request('INIT');
   }
 
-  async registerFile(fileName, buffer) {
-    return this._request('REGISTER_FILE', { fileName, buffer }, buffer ? [buffer] : undefined);
+  async registerFile(fileName, fileURLOrBuffer) {
+    // Support both fileURL (string) and buffer (ArrayBuffer)
+    if (fileURLOrBuffer instanceof ArrayBuffer) {
+      // Local file - pass buffer with transfer
+      return this._request('REGISTER_FILE', { fileName, buffer: fileURLOrBuffer }, [fileURLOrBuffer]);
+    } else {
+      // Server-served file - pass fileURL
+      return this._request('REGISTER_FILE', { fileName, fileURL: fileURLOrBuffer });
+    }
   }
 
   async query(sql, params = []) {
     return this._request('QUERY', { sql, params });
+  }
+
+  async clearTables() {
+    return this._request('CLEAR_TABLES');
   }
 
   async unregisterTable(tableName) {

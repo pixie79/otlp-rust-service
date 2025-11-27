@@ -15,6 +15,8 @@ export class MetricGraph {
     this.metricName = options.metricName || 'metric';
     this.maxDataPoints = options.maxDataPoints || 10000;
     this.data = new Map(); // Map of series key to MetricEntry[]
+    this.traceIndices = new Map(); // Map of trace name to index for extendTraces
+    this.isRendered = false; // Track if graph has been rendered
     this.timeRange = {
       start: null,
       end: null,
@@ -100,51 +102,67 @@ export class MetricGraph {
       return;
     }
 
-    const timeRange = this._calculateTimeRange(Date.now() * 1_000_000);
-    const updateData = [];
-    const traceIndices = [];
-    const maxPoints = [];
+    try {
+      const timeRange = this._calculateTimeRange(Date.now() * 1_000_000);
+      const updateData = [];
+      const traceIndices = [];
+      const maxPoints = [];
 
-    // Prepare update data for each series that has new data
-    for (const [seriesKey, seriesData] of newDataBySeries.entries()) {
-      const storedIndex = this.traceIndices.get(seriesKey);
-      if (storedIndex === undefined) {
-        // New series, need full render
-        this._render();
-        return;
-      }
+      // Prepare update data for each series that has new data
+      for (const [seriesKey, seriesData] of newDataBySeries.entries()) {
+        const storedIndex = this.traceIndices.get(seriesKey);
+        if (storedIndex === undefined) {
+          // New series, need full render
+          this._render();
+          return;
+        }
 
-      // Filter by time range
-      const filtered = seriesData.filter((m) => {
-        if (timeRange.start && m.timestamp < timeRange.start) return false;
-        if (timeRange.end && m.timestamp > timeRange.end) return false;
-        return true;
-      });
-
-      if (filtered.length === 0) continue;
-
-      // Get existing data length from stored data
-      const existing = this.data.get(seriesKey) || [];
-      const existingLength = existing.length;
-      const newLength = filtered.length;
-      const pointsToAdd = Math.max(0, newLength - existingLength);
-
-      if (pointsToAdd > 0) {
-        const newPoints = filtered.slice(-pointsToAdd);
-        const x = newPoints.map((m) => new Date(m.timestamp / 1_000_000));
-        const y = newPoints.map((m) => m.value);
-
-        updateData.push({
-          x: [x],
-          y: [y],
+        // Filter by time range
+        const filtered = seriesData.filter((m) => {
+          if (!m || typeof m.timestamp !== 'number' || typeof m.value !== 'number') return false;
+          if (timeRange.start && m.timestamp < timeRange.start) return false;
+          if (timeRange.end && m.timestamp > timeRange.end) return false;
+          return true;
         });
-        traceIndices.push(storedIndex);
-        maxPoints.push(this.maxDataPoints);
-      }
-    }
 
-    if (updateData.length > 0) {
-      Plotly.extendTraces(this.container, updateData, traceIndices, maxPoints);
+        if (filtered.length === 0) continue;
+
+        // Get existing data length from stored data
+        const existing = this.data.get(seriesKey) || [];
+        const existingLength = existing.length;
+        const newLength = filtered.length;
+        const pointsToAdd = Math.max(0, newLength - existingLength);
+
+        if (pointsToAdd > 0) {
+          const newPoints = filtered.slice(-pointsToAdd);
+          const x = newPoints.map((m) => {
+            const date = new Date(m.timestamp / 1_000_000);
+            return isNaN(date.getTime()) ? null : date;
+          }).filter(d => d !== null);
+          const y = newPoints.map((m) => {
+            const val = Number(m.value);
+            return isNaN(val) ? null : val;
+          }).filter(v => v !== null);
+
+          // Only add if we have valid data
+          if (x.length > 0 && y.length > 0 && x.length === y.length) {
+            updateData.push({
+              x: [x],
+              y: [y],
+            });
+            traceIndices.push(storedIndex);
+            maxPoints.push(this.maxDataPoints);
+          }
+        }
+      }
+
+      if (updateData.length > 0) {
+        Plotly.extendTraces(this.container, updateData, traceIndices, maxPoints);
+      }
+    } catch (error) {
+      console.error('[MetricGraph] Error in _extendTraces:', error);
+      // Fall back to full render on error
+      this._render();
     }
   }
 
@@ -190,65 +208,101 @@ export class MetricGraph {
    * @private
    */
   _render() {
-    if (this.data.size === 0) {
-      // Show empty state
-      Plotly.purge(this.container);
-      this.container.innerHTML = '<div class="metric-graph__empty"><p>No data available</p></div>';
-      return;
+    try {
+      if (this.data.size === 0) {
+        // Show empty state
+        Plotly.purge(this.container);
+        this.container.innerHTML = '<div class="metric-graph__empty"><p>No data available</p></div>';
+        this.isRendered = false;
+        return;
+      }
+
+      const traces = [];
+      const now = Date.now() * 1_000_000;
+      const timeRange = this._calculateTimeRange(now);
+
+      // Create a trace for each series
+      for (const [seriesKey, metrics] of this.data.entries()) {
+        if (!Array.isArray(metrics) || metrics.length === 0) continue;
+
+        // Filter by time range and validate data
+        const filtered = metrics.filter((m) => {
+          if (!m || typeof m.timestamp !== 'number' || typeof m.value !== 'number') return false;
+          if (isNaN(m.timestamp) || isNaN(m.value)) return false;
+          if (timeRange.start && m.timestamp < timeRange.start) return false;
+          if (timeRange.end && m.timestamp > timeRange.end) return false;
+          return true;
+        });
+
+        if (filtered.length === 0) continue;
+
+        const x = filtered.map((m) => {
+          const date = new Date(m.timestamp / 1_000_000);
+          return isNaN(date.getTime()) ? null : date;
+        }).filter(d => d !== null);
+        
+        const y = filtered.map((m) => {
+          const val = Number(m.value);
+          return isNaN(val) ? null : val;
+        }).filter(v => v !== null);
+        
+        const text = filtered.map((m) => this._formatTooltip(m));
+
+        // Only add trace if we have valid data with matching lengths
+        if (x.length > 0 && y.length > 0 && x.length === y.length && x.length === text.length) {
+          traces.push({
+            name: seriesKey,
+            x,
+            y,
+            text,
+            type: 'scatter',
+            mode: 'lines+markers',
+            hovertemplate: '<b>%{fullData.name}</b><br>%{text}<extra></extra>',
+            line: { width: 2 },
+            marker: { size: 4 },
+          });
+        }
+      }
+
+      // If no valid traces, show empty state
+      if (traces.length === 0) {
+        Plotly.purge(this.container);
+        this.container.innerHTML = '<div class="metric-graph__empty"><p>No valid data available</p></div>';
+        this.isRendered = false;
+        return;
+      }
+
+      const layout = {
+        ...this.plotlyLayout,
+        title: this.metricName,
+        xaxis: {
+          ...this.plotlyLayout.xaxis,
+          range:
+            timeRange.start && timeRange.end
+              ? [new Date(timeRange.start / 1_000_000), new Date(timeRange.end / 1_000_000)]
+              : undefined,
+        },
+      };
+
+      Plotly.react(this.container, traces, layout, this.plotlyConfig).then(() => {
+        // Store trace indices for extendTraces
+        this.traceIndices.clear();
+        traces.forEach((trace, index) => {
+          this.traceIndices.set(trace.name, index);
+        });
+        this.isRendered = true;
+      }).catch((error) => {
+        console.error('[MetricGraph] Plotly.react error:', error);
+        this.isRendered = false;
+        // Show error state
+        this.container.innerHTML = '<div class="metric-graph__empty"><p>Error rendering graph</p></div>';
+      });
+    } catch (error) {
+      console.error('[MetricGraph] Error in _render:', error);
+      this.isRendered = false;
+      // Show error state
+      this.container.innerHTML = '<div class="metric-graph__empty"><p>Error rendering graph</p></div>';
     }
-
-    const traces = [];
-    const now = Date.now() * 1_000_000;
-    const timeRange = this._calculateTimeRange(now);
-
-    // Create a trace for each series
-    for (const [seriesKey, metrics] of this.data.entries()) {
-      // Filter by time range
-      const filtered = metrics.filter((m) => {
-        if (timeRange.start && m.timestamp < timeRange.start) return false;
-        if (timeRange.end && m.timestamp > timeRange.end) return false;
-        return true;
-      });
-
-      if (filtered.length === 0) continue;
-
-      const x = filtered.map((m) => new Date(m.timestamp / 1_000_000));
-      const y = filtered.map((m) => m.value);
-      const text = filtered.map((m) => this._formatTooltip(m));
-
-      traces.push({
-        name: seriesKey,
-        x,
-        y,
-        text,
-        type: 'scatter',
-        mode: 'lines+markers',
-        hovertemplate: '<b>%{fullData.name}</b><br>%{text}<extra></extra>',
-        line: { width: 2 },
-        marker: { size: 4 },
-      });
-    }
-
-    const layout = {
-      ...this.plotlyLayout,
-      title: this.metricName,
-      xaxis: {
-        ...this.plotlyLayout.xaxis,
-        range:
-          timeRange.start && timeRange.end
-            ? [new Date(timeRange.start / 1_000_000), new Date(timeRange.end / 1_000_000)]
-            : undefined,
-      },
-    };
-
-    Plotly.react(this.container, traces, layout, this.plotlyConfig).then(() => {
-      // Store trace indices for extendTraces
-      this.traceIndices.clear();
-      traces.forEach((trace, index) => {
-        this.traceIndices.set(trace.name, index);
-      });
-      this.isRendered = true;
-    });
   }
 
   /**

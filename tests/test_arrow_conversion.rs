@@ -1,9 +1,9 @@
 //! Unit tests for Arrow IPC conversion functions
 
+use opentelemetry::KeyValue;
 use opentelemetry::trace::{
     SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
 };
-use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::SpanData;
 use std::time::{Duration, SystemTime};
 
@@ -52,8 +52,8 @@ async fn test_arrow_ipc_conversion_traces() {
     ];
 
     // Import the exporter to test conversion
-    use otlp_arrow_library::otlp::OtlpFileExporter;
     use otlp_arrow_library::Config;
+    use otlp_arrow_library::otlp::OtlpFileExporter;
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -143,8 +143,8 @@ async fn test_arrow_ipc_conversion_traces() {
 
 #[tokio::test]
 async fn test_arrow_ipc_conversion_empty_traces() {
-    use otlp_arrow_library::otlp::OtlpFileExporter;
     use otlp_arrow_library::Config;
+    use otlp_arrow_library::otlp::OtlpFileExporter;
     use std::path::PathBuf;
     use tempfile::TempDir;
 

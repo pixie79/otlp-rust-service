@@ -6,20 +6,53 @@ const duckdbClient = new DuckDBClient({
   maxTables: configManager.get('maxLoadedFiles'),
 });
 
+// Track initialization state
+let isInitialized = false;
+
 const handlers = {
   async INIT() {
-    await duckdbClient.initialize();
-    return { status: 'ready' };
+    try {
+      console.log('[Worker] Initializing DuckDB client...');
+      await duckdbClient.initialize();
+      isInitialized = true;
+      console.log('[Worker] DuckDB client initialized successfully');
+      return { status: 'ready' };
+    } catch (error) {
+      isInitialized = false;
+      console.error('[Worker] DuckDB initialization failed:', error);
+      console.error('[Worker] Error stack:', error.stack);
+      throw error;
+    }
   },
   async REGISTER_FILE(payload) {
-    const { fileName, buffer } = payload;
-    if (!fileName || !buffer) {
-      throw new Error('REGISTER_FILE requires fileName and buffer');
+    if (!isInitialized) {
+      throw new Error('DuckDBClient is not initialized. Call INIT first.');
     }
-    const tableName = await duckdbClient.registerArrowFile(fileName, buffer);
-    return { tableName };
+    const { fileName, fileURL, buffer } = payload;
+    
+    // Support both fileURL (for server-served files) and buffer (for local files)
+    if (buffer) {
+      // Local file - use buffer directly
+      if (!fileName) {
+        throw new Error('REGISTER_FILE with buffer requires fileName');
+      }
+      const tableName = await duckdbClient.registerArrowFile(fileName, buffer);
+      return { tableName };
+    } else if (fileURL) {
+      // Server-served file - use fileURL
+      if (!fileName) {
+        throw new Error('REGISTER_FILE with fileURL requires fileName');
+      }
+      const tableName = await duckdbClient.registerArrowFile(fileName, fileURL);
+      return { tableName };
+    } else {
+      throw new Error('REGISTER_FILE requires either fileURL or buffer');
+    }
   },
   async QUERY(payload) {
+    if (!isInitialized) {
+      throw new Error('DuckDBClient is not initialized. Call INIT first.');
+    }
     const { sql, params } = payload;
     if (!sql) {
       throw new Error('QUERY requires sql');
@@ -28,6 +61,9 @@ const handlers = {
     return { rows };
   },
   async UNREGISTER_TABLE(payload) {
+    if (!isInitialized) {
+      throw new Error('DuckDBClient is not initialized. Call INIT first.');
+    }
     const { tableName } = payload;
     if (!tableName) {
       throw new Error('UNREGISTER_TABLE requires tableName');
@@ -35,8 +71,21 @@ const handlers = {
     await duckdbClient.unregisterTable(tableName);
     return { tableName };
   },
+  async CLEAR_TABLES() {
+    // If DuckDB isn't initialized yet, clearing tables is a no-op
+    // This is OK - we'll clear tables when DuckDB initializes anyway
+    if (!isInitialized) {
+      console.log('[Worker] CLEAR_TABLES called but DuckDB not initialized yet (no-op)');
+      return { status: 'cleared', note: 'DuckDB not initialized yet' };
+    }
+    await duckdbClient.clearAllTables();
+    return { status: 'cleared' };
+  },
   async SHUTDOWN() {
-    await duckdbClient.close();
+    if (isInitialized) {
+      await duckdbClient.close();
+      isInitialized = false;
+    }
     return { status: 'closed' };
   },
 };

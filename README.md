@@ -23,6 +23,42 @@ A cross-platform Rust library for receiving OpenTelemetry Protocol (OTLP) messag
 
 ## Quick Start
 
+### Demo Application (Recommended for First-Time Users)
+
+The demo application is the easiest way to get started and verify the service is working:
+
+```bash
+# Run the demo application
+cargo run --example demo-app
+```
+
+**Prerequisites**: For dashboard visualization, build the dashboard first:
+```bash
+cd dashboard && npm install && npm run build && cd ..
+```
+
+**If dashboard is not built**: The demo will still run and generate data, but without the web dashboard. Data will be written to `./output_dir/otlp/` and you can view it later after building the dashboard.
+
+The demo will:
+1. Start the dashboard on http://127.0.0.1:8080 (if dashboard is built)
+2. Generate real metrics using OpenTelemetry SDK Meter API and mock spans continuously
+3. Display data in real-time in the dashboard (if enabled)
+
+**To view the dashboard**: 
+1. Open your browser to http://127.0.0.1:8080
+2. Click "Choose Directory" and select the `./output_dir/otlp` directory (the parent directory containing both `traces` and `metrics` subdirectories)
+3. The dashboard will automatically load and display trace and metric data
+
+**Important**: Select the `otlp` directory (not `otlp/traces` or `otlp/metrics`), as the dashboard needs access to both subdirectories.
+
+**To stop the demo**: Press `Ctrl+C` (the demo will flush data and shutdown gracefully)
+
+The demo application serves as both:
+- **Verification tool**: Proves the service is working correctly
+- **Reference implementation**: Shows how to use the SDK in your own applications
+
+See `examples/demo-app.rs` for the complete source code with extensive comments.
+
 ### As a Standalone Service
 
 ```bash
@@ -316,6 +352,29 @@ See [API documentation](src/api/public.rs) for complete Rust API reference.
 See [Python API contract](specs/001-otlp-arrow-library/contracts/python-api.md) for Python API reference.
 
 ## Examples
+
+### Demo Application
+
+The demo application (`examples/demo-app.rs`) is the recommended starting point for new users:
+
+**Run the demo**:
+```bash
+cargo run --example demo-app
+```
+
+**What it does**:
+- Enables the dashboard automatically (http://127.0.0.1:8080)
+- Generates mock metrics and spans continuously
+- Demonstrates all SDK usage patterns with extensive comments
+- Shows parent-child span relationships and different span kinds
+- Includes graceful shutdown on Ctrl+C
+
+**Use cases**:
+- Verify the service is working after installation
+- See a complete reference implementation
+- Learn SDK usage patterns by reading the well-commented code
+
+### Other Examples
 
 - **Standalone Service**: `examples/standalone.rs` - Run as a standalone gRPC service
 - **Embedded Library**: `examples/embedded.rs` - Use as an embedded component

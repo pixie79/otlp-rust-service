@@ -8,18 +8,25 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{error, info, warn};
 
-/// HTTP server for serving dashboard static files
+/// HTTP server for serving dashboard static files and Arrow IPC files
 pub struct DashboardServer {
     static_dir: PathBuf,
+    output_dir: PathBuf,
     port: u16,
     bind_address: String,
 }
 
 impl DashboardServer {
     /// Create a new dashboard server
-    pub fn new(static_dir: impl Into<PathBuf>, port: u16, bind_address: impl Into<String>) -> Self {
+    pub fn new(
+        static_dir: impl Into<PathBuf>,
+        output_dir: impl Into<PathBuf>,
+        port: u16,
+        bind_address: impl Into<String>,
+    ) -> Self {
         Self {
             static_dir: static_dir.into(),
+            output_dir: output_dir.into(),
             port,
             bind_address: bind_address.into(),
         }
@@ -39,6 +46,7 @@ impl DashboardServer {
             port = self.port,
             bind_address = %self.bind_address,
             static_dir = %self.static_dir.display(),
+            output_dir = %self.output_dir.display(),
             "Dashboard HTTP server started"
         );
         info!(
@@ -47,14 +55,21 @@ impl DashboardServer {
         );
 
         let static_dir = Arc::new(self.static_dir.clone());
+        let output_dir = Arc::new(self.output_dir.clone());
 
         let handle = tokio::spawn(async move {
             loop {
                 match listener.accept().await {
                     Ok((stream, addr)) => {
                         let static_dir = static_dir.clone();
+                        let output_dir = output_dir.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = Self::handle_request(stream, static_dir.as_path()).await
+                            if let Err(e) = Self::handle_request(
+                                stream,
+                                static_dir.as_path(),
+                                output_dir.as_path(),
+                            )
+                            .await
                             {
                                 warn!(client = %addr, error = %e, "Error handling dashboard request");
                             }
@@ -74,6 +89,7 @@ impl DashboardServer {
     async fn handle_request(
         mut stream: TcpStream,
         static_dir: &Path,
+        output_dir: &Path,
     ) -> Result<(), std::io::Error> {
         let mut buffer = [0; 8192];
         let n = stream.read(&mut buffer).await?;
@@ -105,6 +121,62 @@ impl DashboardServer {
             return Self::send_response(&mut stream, 405, "Method Not Allowed", b"", None).await;
         }
 
+        // Handle Arrow IPC files from output_dir
+        if path.starts_with("/data/") {
+            // Remove /data/ prefix and decode URL
+            let relative_path = path.trim_start_matches("/data/");
+
+            // Security: prevent directory traversal
+            let file_path = PathBuf::from(relative_path);
+            if file_path
+                .components()
+                .any(|c| matches!(c, std::path::Component::ParentDir))
+            {
+                return Self::send_response(&mut stream, 403, "Forbidden", b"", None).await;
+            }
+
+            // Resolve file path in output_dir
+            let full_path = output_dir.join(&file_path);
+
+            // Check if file exists
+            if !full_path.exists() {
+                return Self::send_response(&mut stream, 404, "Not Found", b"", None).await;
+            }
+
+            // Read and serve Arrow file
+            match tokio::fs::read(&full_path).await {
+                Ok(content) => {
+                    // Set content type for Arrow files
+                    let content_type =
+                        if file_path.extension().and_then(|e| e.to_str()) == Some("arrows") {
+                            "application/vnd.apache.arrow.stream"
+                        } else {
+                            "application/octet-stream"
+                        };
+                    return Self::send_response(
+                        &mut stream,
+                        200,
+                        "OK",
+                        &content,
+                        Some(content_type),
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    error!(file = %full_path.display(), error = %e, "Failed to read Arrow file");
+                    return Self::send_response(
+                        &mut stream,
+                        500,
+                        "Internal Server Error",
+                        b"",
+                        None,
+                    )
+                    .await;
+                }
+            }
+        }
+
+        // Handle static dashboard files
         // Normalize path
         let file_path = if path == "/" {
             "index.html"
@@ -180,6 +252,7 @@ impl DashboardServer {
             Some("js") => "application/javascript; charset=utf-8",
             Some("css") => "text/css; charset=utf-8",
             Some("json") => "application/json; charset=utf-8",
+            Some("wasm") => "application/wasm", // Required for WebAssembly compilation and extensions
             Some("png") => "image/png",
             Some("jpg") | Some("jpeg") => "image/jpeg",
             Some("svg") => "image/svg+xml",
@@ -188,6 +261,7 @@ impl DashboardServer {
             Some("woff2") => "font/woff2",
             Some("ttf") => "font/ttf",
             Some("map") => "application/json",
+            Some("arrows") => "application/vnd.apache.arrow.stream",
             _ => "application/octet-stream",
         }
     }

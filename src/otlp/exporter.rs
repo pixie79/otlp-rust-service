@@ -10,9 +10,8 @@ use anyhow::Result;
 use arrow::array::*;
 use arrow::datatypes::*;
 use arrow::ipc::writer::StreamWriter;
-use futures::future::BoxFuture;
 use futures::FutureExt;
-use opentelemetry_sdk::metrics::data::ResourceMetrics;
+use futures::future::BoxFuture;
 use opentelemetry_sdk::trace::{SpanData, SpanExporter};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -54,17 +53,19 @@ impl std::fmt::Debug for OtlpFileExporter {
     }
 }
 
-#[derive(Debug)]
 struct TracesWriter {
     current_file: Option<File>,
+    current_writer: Option<StreamWriter<std::io::BufWriter<File>>>,
+    current_schema: Option<Arc<Schema>>,
     current_size: u64,
     output_dir: PathBuf,
     sequence: u64,
 }
 
-#[derive(Debug)]
 struct MetricsWriter {
     current_file: Option<File>,
+    current_writer: Option<StreamWriter<std::io::BufWriter<File>>>,
+    current_schema: Option<Arc<Schema>>,
     current_size: u64,
     output_dir: PathBuf,
     sequence: u64,
@@ -120,12 +121,16 @@ impl OtlpFileExporter {
         let exporter = Self {
             traces_writer: Arc::new(Mutex::new(TracesWriter {
                 current_file: None,
+                current_writer: None,
+                current_schema: None,
                 current_size: 0,
                 output_dir: traces_dir,
                 sequence: 0,
             })),
             metrics_writer: Arc::new(Mutex::new(MetricsWriter {
                 current_file: None,
+                current_writer: None,
+                current_schema: None,
                 current_size: 0,
                 output_dir: metrics_dir,
                 sequence: 0,
@@ -155,45 +160,12 @@ impl OtlpFileExporter {
             *count += spans.len() as u64;
         }
 
-        // Convert spans to Arrow IPC format
-        let data = convert_spans_to_arrow_ipc(&spans)
+        // Convert spans to Arrow RecordBatch
+        let batch = convert_spans_to_arrow_batch(&spans)
             .map_err(|e| OtlpError::Export(OtlpExportError::ArrowConversionError(e.to_string())))?;
 
-        let data_size = data.len() as u64;
-        let mut writer = self.traces_writer.lock().await;
-        let output_dir = writer.output_dir.clone();
-
-        // Check if we need to rotate
-        if writer.current_size + data_size > self.max_file_size {
-            writer
-                .rotate_file(&output_dir, "traces", self.format)
-                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
-        }
-
-        // Open file if needed
-        if writer.current_file.is_none() {
-            writer
-                .open_new_file(&output_dir, "traces", self.format)
-                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
-        }
-
-        // Write data
-        if let Some(ref mut file) = writer.current_file {
-            file.write_all(&data).map_err(OtlpError::Io)?;
-            file.flush().map_err(OtlpError::Io)?;
-            writer.current_size += data_size;
-            trace!(
-                "Wrote {} spans ({} bytes) to trace file",
-                spans.len(),
-                data_size
-            );
-
-            // Update metrics
-            {
-                let mut count = self.files_written.lock().await;
-                *count += 1;
-            }
-        }
+        // Write batch directly to file using persistent StreamWriter
+        self.write_traces_arrow_batch(&batch).await?;
 
         // Forward traces if forwarding is enabled
         if let Some(ref forwarder) = self.forwarder {
@@ -217,42 +189,64 @@ impl OtlpFileExporter {
         Ok(())
     }
 
-    /// Export metrics to file
-    pub async fn export_metrics(&self, metrics: &ResourceMetrics) -> Result<(), OtlpError> {
-        // Update metrics
-        {
-            let mut count = self.messages_received.lock().await;
-            *count += 1;
-        }
-
-        // Convert metrics to Arrow IPC format
-        let data = convert_metrics_to_arrow_ipc(metrics)
-            .map_err(|e| OtlpError::Export(OtlpExportError::ArrowConversionError(e.to_string())))?;
-
-        let data_size = data.len() as u64;
-        let mut writer = self.metrics_writer.lock().await;
+    /// Write Arrow RecordBatch to traces file using persistent StreamWriter
+    ///
+    /// Uses a persistent StreamWriter that writes multiple batches to the same stream.
+    /// Only finishes the stream when rotating the file.
+    pub(crate) async fn write_traces_arrow_batch(
+        &self,
+        batch: &arrow::record_batch::RecordBatch,
+    ) -> Result<(), OtlpError> {
+        let mut writer = self.traces_writer.lock().await;
         let output_dir = writer.output_dir.clone();
+        let schema = batch.schema();
 
-        // Check if we need to rotate
-        if writer.current_size + data_size > self.max_file_size {
+        // Estimate batch size (rough estimate)
+        let estimated_size = batch.get_array_memory_size() as u64;
+
+        // Check if we need to rotate (before writing)
+        if writer.current_size + estimated_size > self.max_file_size {
+            // Finish current writer before rotating
+            if writer.current_writer.is_some() {
+                let saved_schema = writer.current_schema.clone();
+                writer
+                    .rotate_file(&output_dir, "traces", self.format)
+                    .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
+                // Reopen with the same schema
+                if let Some(ref schema) = saved_schema {
+                    writer
+                        .open_new_file(&output_dir, "traces", self.format, schema.clone())
+                        .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
+                }
+            }
+        }
+
+        // Open file and create StreamWriter if needed
+        if writer.current_writer.is_none() {
             writer
-                .rotate_file(&output_dir, "metrics", self.format)
+                .open_new_file(&output_dir, "traces", self.format, schema.clone())
                 .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
         }
 
-        // Open file if needed
-        if writer.current_file.is_none() {
-            writer
-                .open_new_file(&output_dir, "metrics", self.format)
-                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
-        }
+        // Write batch to StreamWriter
+        if let Some(ref mut stream_writer) = writer.current_writer {
+            stream_writer.write(batch).map_err(|e| {
+                OtlpError::Export(OtlpExportError::ArrowConversionError(format!(
+                    "Failed to write Arrow batch: {}",
+                    e
+                )))
+            })?;
 
-        // Write data
-        if let Some(ref mut file) = writer.current_file {
-            file.write_all(&data).map_err(OtlpError::Io)?;
-            file.flush().map_err(OtlpError::Io)?;
-            writer.current_size += data_size;
-            trace!("Wrote metrics ({} bytes) to file", data_size);
+            // Flush the underlying file
+            stream_writer.get_mut().flush().map_err(OtlpError::Io)?;
+
+            writer.current_size += estimated_size;
+            trace!(
+                "Wrote {} spans ({} rows, ~{} bytes) to trace file",
+                batch.num_rows(),
+                batch.num_rows(),
+                estimated_size
+            );
 
             // Update metrics
             {
@@ -261,22 +255,104 @@ impl OtlpFileExporter {
             }
         }
 
-        // Forward metrics if forwarding is enabled
-        if let Some(ref forwarder) = self.forwarder {
-            if let Err(e) = forwarder.forward_metrics(metrics).await {
-                warn!(error = %e, "Failed to forward metrics, but local storage succeeded");
-                // Update error metrics
-                {
-                    let mut count = self.errors_count.lock().await;
-                    *count += 1;
+        Ok(())
+    }
+
+    /// Export metrics from Protobuf format
+    ///
+    /// Converts Protobuf ExportMetricsServiceRequest to Arrow IPC and writes to file.
+    ///
+    /// This method uses our InternalResourceMetrics (with public fields) - NO PROXY NEEDED.
+    /// Flow: Protobuf → InternalResourceMetrics → Arrow RecordBatch → Arrow IPC
+    /// Internal format: Arrow RecordBatch (for storage)
+    pub(crate) async fn export_metrics_from_protobuf(
+        &self,
+        request: &opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest,
+    ) -> Result<(), OtlpError> {
+        use crate::otlp::metrics_extractor::extract_from_protobuf;
+
+        // Convert Protobuf → InternalResourceMetrics (our structure with public fields, no proxy)
+        let internal_metrics = extract_from_protobuf(request).map_err(|e| {
+            OtlpError::Export(OtlpExportError::FormatConversionError(format!(
+                "Failed to extract metrics from protobuf: {}",
+                e
+            )))
+        })?;
+
+        // Convert InternalResourceMetrics → Arrow (direct conversion, no proxy)
+        let arrow_batch = internal_metrics.to_arrow_batch().map_err(|e| {
+            OtlpError::Export(OtlpExportError::ArrowConversionError(format!(
+                "Failed to convert metrics to Arrow: {}",
+                e
+            )))
+        })?;
+
+        // Write Arrow batch directly to file using persistent StreamWriter
+        self.write_metrics_arrow_batch(&arrow_batch).await
+    }
+
+    /// Write Arrow RecordBatch to metrics file using persistent StreamWriter
+    ///
+    /// Uses a persistent StreamWriter that writes multiple batches to the same stream.
+    /// Only finishes the stream when rotating the file.
+    pub(crate) async fn write_metrics_arrow_batch(
+        &self,
+        batch: &arrow::record_batch::RecordBatch,
+    ) -> Result<(), OtlpError> {
+        let mut writer = self.metrics_writer.lock().await;
+        let output_dir = writer.output_dir.clone();
+        let schema = batch.schema();
+
+        // Estimate batch size (rough estimate)
+        let estimated_size = batch.get_array_memory_size() as u64;
+
+        // Check if we need to rotate (before writing)
+        if writer.current_size + estimated_size > self.max_file_size {
+            // Finish current writer before rotating
+            if writer.current_writer.is_some() {
+                let saved_schema = writer.current_schema.clone();
+                writer
+                    .rotate_file(&output_dir, "metrics", self.format)
+                    .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
+                // Reopen with the same schema
+                if let Some(ref schema) = saved_schema {
+                    writer
+                        .open_new_file(&output_dir, "metrics", self.format, schema.clone())
+                        .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
                 }
-                // Don't fail - forwarding is best-effort
-            } else {
-                // Update format conversion metrics if conversion occurred
-                {
-                    let mut count = self.format_conversions.lock().await;
-                    *count += 1;
-                }
+            }
+        }
+
+        // Open file and create StreamWriter if needed
+        if writer.current_writer.is_none() {
+            writer
+                .open_new_file(&output_dir, "metrics", self.format, schema.clone())
+                .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
+        }
+
+        // Write batch to StreamWriter
+        if let Some(ref mut stream_writer) = writer.current_writer {
+            stream_writer.write(batch).map_err(|e| {
+                OtlpError::Export(OtlpExportError::ArrowConversionError(format!(
+                    "Failed to write Arrow batch: {}",
+                    e
+                )))
+            })?;
+
+            // Flush the underlying file
+            stream_writer.get_mut().flush().map_err(OtlpError::Io)?;
+
+            writer.current_size += estimated_size;
+            trace!(
+                "Wrote metrics batch ({} rows, ~{} bytes) to file",
+                batch.num_rows(),
+                estimated_size
+            );
+
+            // Update metrics
+            {
+                let mut count = self.files_written.lock().await;
+                *count += 1;
             }
         }
 
@@ -305,13 +381,13 @@ impl OtlpFileExporter {
     /// Flush all pending writes
     pub async fn flush(&self) -> Result<(), OtlpError> {
         let mut traces_writer = self.traces_writer.lock().await;
-        if let Some(ref mut file) = traces_writer.current_file {
-            file.flush().map_err(OtlpError::Io)?;
+        if let Some(ref mut stream_writer) = traces_writer.current_writer {
+            stream_writer.get_mut().flush().map_err(OtlpError::Io)?;
         }
 
         let mut metrics_writer = self.metrics_writer.lock().await;
-        if let Some(ref mut file) = metrics_writer.current_file {
-            file.flush().map_err(OtlpError::Io)?;
+        if let Some(ref mut stream_writer) = metrics_writer.current_writer {
+            stream_writer.get_mut().flush().map_err(OtlpError::Io)?;
         }
 
         Ok(())
@@ -445,9 +521,12 @@ impl TracesWriter {
         output_dir: &Path,
         prefix: &str,
         _format: ExportFormat,
+        schema: Arc<Schema>,
     ) -> Result<()> {
+        use std::io::BufWriter;
+
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-        let extension = "arrow";
+        let extension = "arrows";
         let filename = format!(
             "otlp_{}_{}_{:04}.{}",
             prefix, timestamp, self.sequence, extension
@@ -456,31 +535,52 @@ impl TracesWriter {
 
         let file = OpenOptions::new()
             .create(true)
-            .append(true)
+            .write(true)
+            .truncate(true)
             .open(&file_path)
             .map_err(|e| {
                 anyhow::anyhow!("Failed to create OTLP file {}: {}", file_path.display(), e)
             })?;
 
-        self.current_file = Some(file);
+        let buf_writer = BufWriter::new(file);
+        let stream_writer = StreamWriter::try_new(buf_writer, &schema)
+            .map_err(|e| anyhow::anyhow!("Failed to create Arrow StreamWriter: {}", e))?;
+
+        self.current_file = None; // We use the file through the StreamWriter now
+        self.current_writer = Some(stream_writer);
+        self.current_schema = Some(schema);
         self.current_size = 0;
 
         info!(
             file = %file_path.display(),
-            "Opened new OTLP {} file",
+            "Opened new OTLP {} file with StreamWriter",
             prefix
         );
 
         Ok(())
     }
 
-    fn rotate_file(&mut self, output_dir: &Path, prefix: &str, format: ExportFormat) -> Result<()> {
-        if let Some(ref mut file) = self.current_file {
-            file.flush()?;
+    fn rotate_file(
+        &mut self,
+        _output_dir: &Path,
+        _prefix: &str,
+        _format: ExportFormat,
+    ) -> Result<()> {
+        // Finish the current StreamWriter if it exists
+        if let Some(ref mut stream_writer) = self.current_writer {
+            stream_writer
+                .finish()
+                .map_err(|e| anyhow::anyhow!("Failed to finish Arrow StreamWriter: {}", e))?;
         }
+
+        self.current_writer = None;
+        self.current_schema = None;
         self.current_file = None;
         self.sequence += 1;
-        self.open_new_file(output_dir, prefix, format)
+
+        // We need the schema to open a new file, but we don't have it here
+        // This will be handled by the caller providing the schema
+        Ok(())
     }
 }
 
@@ -490,9 +590,12 @@ impl MetricsWriter {
         output_dir: &Path,
         prefix: &str,
         _format: ExportFormat,
+        schema: Arc<Schema>,
     ) -> Result<()> {
+        use std::io::BufWriter;
+
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-        let extension = "arrow";
+        let extension = "arrows";
         let filename = format!(
             "otlp_{}_{}_{:04}.{}",
             prefix, timestamp, self.sequence, extension
@@ -501,42 +604,62 @@ impl MetricsWriter {
 
         let file = OpenOptions::new()
             .create(true)
-            .append(true)
+            .write(true)
+            .truncate(true)
             .open(&file_path)
             .map_err(|e| {
                 anyhow::anyhow!("Failed to create OTLP file {}: {}", file_path.display(), e)
             })?;
 
-        self.current_file = Some(file);
+        let buf_writer = BufWriter::new(file);
+        let stream_writer = StreamWriter::try_new(buf_writer, &schema)
+            .map_err(|e| anyhow::anyhow!("Failed to create Arrow StreamWriter: {}", e))?;
+
+        self.current_file = None; // We use the file through the StreamWriter now
+        self.current_writer = Some(stream_writer);
+        self.current_schema = Some(schema);
         self.current_size = 0;
 
         info!(
             file = %file_path.display(),
-            "Opened new OTLP {} file",
+            "Opened new OTLP {} file with StreamWriter",
             prefix
         );
 
         Ok(())
     }
 
-    fn rotate_file(&mut self, output_dir: &Path, prefix: &str, format: ExportFormat) -> Result<()> {
-        if let Some(ref mut file) = self.current_file {
-            file.flush()?;
+    fn rotate_file(
+        &mut self,
+        _output_dir: &Path,
+        _prefix: &str,
+        _format: ExportFormat,
+    ) -> Result<()> {
+        // Finish the current StreamWriter if it exists
+        if let Some(ref mut stream_writer) = self.current_writer {
+            stream_writer
+                .finish()
+                .map_err(|e| anyhow::anyhow!("Failed to finish Arrow StreamWriter: {}", e))?;
         }
+
+        self.current_writer = None;
+        self.current_schema = None;
         self.current_file = None;
         self.sequence += 1;
-        self.open_new_file(output_dir, prefix, format)
+
+        // We need the schema to open a new file, but we don't have it here
+        // This will be handled by the caller providing the schema
+        Ok(())
     }
 }
 
-/// Convert spans to Arrow IPC format
-fn convert_spans_to_arrow_ipc(spans: &[SpanData]) -> Result<Vec<u8>> {
+/// Convert spans to Arrow RecordBatch
+fn convert_spans_to_arrow_batch(spans: &[SpanData]) -> Result<arrow::record_batch::RecordBatch> {
     use arrow::record_batch::RecordBatch;
-    use std::io::Cursor;
     use std::sync::Arc;
 
     if spans.is_empty() {
-        return Ok(Vec::new());
+        return Err(anyhow::anyhow!("Cannot create batch from empty spans"));
     }
 
     // Create Arrow schema for spans
@@ -654,104 +777,7 @@ fn convert_spans_to_arrow_ipc(spans: &[SpanData]) -> Result<Vec<u8>> {
         ],
     )?;
 
-    // Serialize to Arrow IPC stream format
-    let mut buffer = Vec::new();
-    let cursor = Cursor::new(&mut buffer);
-    let mut writer = StreamWriter::try_new(cursor, batch.schema().as_ref())?;
-    writer.write(&batch)?;
-    writer.finish()?;
-
-    Ok(buffer)
-}
-
-/// Convert metrics Data to Arrow IPC format
-fn convert_metrics_to_arrow_ipc(metrics: &ResourceMetrics) -> Result<Vec<u8>> {
-    use arrow::record_batch::RecordBatch;
-    use std::io::Cursor;
-    use std::sync::Arc;
-
-    // Since ResourceMetrics fields are private, we'll use Debug format to extract information
-    // This is a simplified approach - a full implementation would use opentelemetry-proto
-    let metrics_debug = format!("{:?}", metrics);
-
-    // Create a simple record with the debug string
-    // Note: Arrow arrays require Vec, not arrays, so we use vec! here
-    #[allow(clippy::useless_vec)]
-    let metric_names = vec![Some("resource_metrics".to_string())];
-    let values = vec![0.0]; // Placeholder
-    let timestamps = vec![Some(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64,
-    )];
-    #[allow(clippy::useless_vec)]
-    let metric_types = vec![Some("debug".to_string())];
-    #[allow(clippy::useless_vec)]
-    let attributes = vec![Some(metrics_debug)];
-
-    // If no metrics, return empty batch
-    if metric_names.is_empty() {
-        let schema = Schema::new(vec![
-            Field::new("metric_name", DataType::Utf8, false),
-            Field::new("value", DataType::Float64, false),
-            Field::new("timestamp_unix_nano", DataType::UInt64, false),
-            Field::new("metric_type", DataType::Utf8, false),
-            Field::new("attributes", DataType::Utf8, true),
-        ]);
-
-        let batch = RecordBatch::try_new(
-            Arc::new(schema),
-            vec![
-                Arc::new(StringArray::from(Vec::<String>::new())),
-                Arc::new(Float64Array::from(Vec::<f64>::new())),
-                Arc::new(UInt64Array::from(Vec::<u64>::new())),
-                Arc::new(StringArray::from(Vec::<String>::new())),
-                Arc::new(StringArray::from(Vec::<Option<String>>::new())),
-            ],
-        )?;
-
-        let mut buffer = Vec::new();
-        let cursor = Cursor::new(&mut buffer);
-        let mut writer = StreamWriter::try_new(cursor, batch.schema().as_ref())?;
-        writer.write(&batch)?;
-        writer.finish()?;
-
-        return Ok(buffer);
-    }
-
-    // Build Arrow arrays
-    let name_refs: Vec<Option<&str>> = metric_names.iter().map(|opt| opt.as_deref()).collect();
-    let type_refs: Vec<Option<&str>> = metric_types.iter().map(|opt| opt.as_deref()).collect();
-    let attr_refs: Vec<Option<&str>> = attributes.iter().map(|opt| opt.as_deref()).collect();
-
-    let schema = Schema::new(vec![
-        Field::new("metric_name", DataType::Utf8, false),
-        Field::new("value", DataType::Float64, false),
-        Field::new("timestamp_unix_nano", DataType::UInt64, false),
-        Field::new("metric_type", DataType::Utf8, false),
-        Field::new("attributes", DataType::Utf8, true),
-    ]);
-
-    let batch = RecordBatch::try_new(
-        Arc::new(schema),
-        vec![
-            Arc::new(StringArray::from(name_refs)),
-            Arc::new(Float64Array::from(values)),
-            Arc::new(UInt64Array::from(timestamps)),
-            Arc::new(StringArray::from(type_refs)),
-            Arc::new(StringArray::from(attr_refs)),
-        ],
-    )?;
-
-    // Serialize to Arrow IPC stream format
-    let mut buffer = Vec::new();
-    let cursor = Cursor::new(&mut buffer);
-    let mut writer = StreamWriter::try_new(cursor, batch.schema().as_ref())?;
-    writer.write(&batch)?;
-    writer.finish()?;
-
-    Ok(buffer)
+    Ok(batch)
 }
 
 /// File-based SpanExporter implementation
@@ -788,134 +814,17 @@ impl SpanExporter for FileSpanExporter {
     fn shutdown(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {
         // Flush any pending writes
         // Try to get current runtime handle
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            handle.block_on(async {
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => handle.block_on(async {
                 self.file_exporter.flush().await.map_err(|e| {
                     opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string())
                 })
-            })
-        } else {
-            // No runtime available, can't flush
-            Ok(())
+            }),
+            _ => {
+                // No runtime available, can't flush
+                Ok(())
+            }
         }
-    }
-}
-
-/// File-based MetricsExporter implementation
-#[derive(Debug)]
-pub struct FileMetricExporter {
-    file_exporter: Arc<OtlpFileExporter>,
-}
-
-impl FileMetricExporter {
-    /// Create a new FileMetricExporter with the given file exporter
-    pub fn new(file_exporter: Arc<OtlpFileExporter>) -> Self {
-        Self { file_exporter }
-    }
-}
-
-impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for FileMetricExporter {
-    fn export(
-        &self,
-        metrics: &ResourceMetrics,
-    ) -> impl std::future::Future<Output = opentelemetry_sdk::error::OTelSdkResult> + Send {
-        let file_exporter = self.file_exporter.clone();
-
-        async move {
-            // Convert and write metrics
-            file_exporter.export_metrics(metrics).await.map_err(|e| {
-                warn!("Failed to export metrics to file: {}", e);
-                opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string())
-            })
-        }
-    }
-
-    fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            handle.block_on(async {
-                self.file_exporter.flush().await.map_err(|e| {
-                    opentelemetry_sdk::error::OTelSdkError::InternalFailure(e.to_string())
-                })
-            })
-        } else {
-            Ok(())
-        }
-    }
-
-    fn shutdown_with_timeout(
-        &self,
-        _timeout: std::time::Duration,
-    ) -> opentelemetry_sdk::error::OTelSdkResult {
-        self.force_flush()
-    }
-
-    fn temporality(&self) -> opentelemetry_sdk::metrics::Temporality {
-        opentelemetry_sdk::metrics::Temporality::Cumulative
-    }
-}
-
-/// OtlpLibrary-based MetricExporter implementation
-///
-/// This exporter wraps an `OtlpLibrary` instance and implements `PushMetricExporter`
-/// for seamless integration with OpenTelemetry SDK's `PeriodicReader`.
-#[derive(Clone, Debug)]
-pub struct OtlpMetricExporter {
-    library: Arc<crate::api::public::OtlpLibrary>,
-}
-
-impl OtlpMetricExporter {
-    /// Create a new OtlpMetricExporter with the given library instance
-    pub(crate) fn new(library: Arc<crate::api::public::OtlpLibrary>) -> Self {
-        Self { library }
-    }
-}
-
-impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for OtlpMetricExporter {
-    fn export(
-        &self,
-        metrics: &ResourceMetrics,
-    ) -> impl std::future::Future<Output = opentelemetry_sdk::error::OTelSdkResult> + Send {
-        let library = self.library.clone();
-
-        async move {
-            library.export_metrics_ref(metrics).await.map_err(|e| {
-                warn!("Failed to export metrics via OtlpLibrary: {}", e);
-                opentelemetry_sdk::error::OTelSdkError::InternalFailure(format!(
-                    "OtlpLibrary export failed: {}",
-                    e
-                ))
-            })
-        }
-    }
-
-    fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
-        // Note: This is a best-effort async flush that doesn't block.
-        // The flush happens asynchronously in the background.
-        // For guaranteed flush completion, call OtlpLibrary::flush() directly.
-        // This implementation spawns a task to avoid blocking the current runtime,
-        // which is necessary when called from OpenTelemetry SDK's synchronous context.
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            let library = self.library.clone();
-            handle.spawn(async move {
-                let _ = library.flush().await;
-            });
-            Ok(())
-        } else {
-            // No runtime available, can't flush
-            Ok(())
-        }
-    }
-
-    fn shutdown_with_timeout(
-        &self,
-        _timeout: std::time::Duration,
-    ) -> opentelemetry_sdk::error::OTelSdkResult {
-        // Shutdown is handled by OtlpLibrary::shutdown() separately
-        Ok(())
-    }
-
-    fn temporality(&self) -> opentelemetry_sdk::metrics::Temporality {
-        opentelemetry_sdk::metrics::Temporality::Cumulative
     }
 }
 

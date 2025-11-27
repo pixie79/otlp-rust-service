@@ -38,15 +38,9 @@ export class FileWatcher {
     const seen = new Set();
 
     for (const fileHandle of files) {
-      // Use cached metadata if available to avoid redundant file reads
-      const cacheKey = fileHandle.name || (await this.fileReader.getFileMetadata(fileHandle)).name;
-      let metadata = this.metadataCache.get(cacheKey);
-
-      if (!metadata) {
-        metadata = await this.fileReader.getFileMetadata(fileHandle);
-        this.metadataCache.set(cacheKey, metadata);
-      }
-
+      // Always get fresh metadata to detect changes accurately
+      // Don't use cache for metadata - we need to detect size/modification time changes
+      const metadata = await this.fileReader.getFileMetadata(fileHandle);
       const key = metadata.name;
       const previous = this.knownFiles.get(key);
       seen.add(key);
@@ -60,8 +54,11 @@ export class FileWatcher {
 
       // Check if file changed (size or modification time)
       if (previous.size !== metadata.size || previous.lastModified !== metadata.lastModified) {
-        // Update cache with new metadata
-        this.metadataCache.set(cacheKey, metadata);
+        console.log(`[FileWatcher] File changed: ${key}, size: ${previous.size} -> ${metadata.size}, modified: ${previous.lastModified} -> ${metadata.lastModified}`);
+        // Clear cache for this file to force fresh read
+        const cacheKey = fileHandle.name || metadata.name;
+        this.metadataCache.delete(cacheKey);
+        // Update with new metadata
         this.knownFiles.set(key, metadata);
         changedFiles.push({ fileHandle, metadata, change: 'modified' });
         this.onFileChanged(fileHandle, metadata);
@@ -84,5 +81,6 @@ export class FileWatcher {
    */
   clearCache() {
     this.metadataCache.clear();
+    this.knownFiles.clear();
   }
 }

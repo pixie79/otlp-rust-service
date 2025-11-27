@@ -1,4 +1,4 @@
-//! Unit tests for export_metrics_ref method
+//! Unit tests for export_metrics_arrow method
 
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use otlp_arrow_library::{Config, OtlpLibrary};
@@ -14,7 +14,7 @@ fn create_test_metric() -> ResourceMetrics {
 }
 
 #[tokio::test]
-async fn test_export_metrics_ref_with_valid_resource_metrics() {
+async fn test_export_metrics_arrow_with_valid_resource_metrics() {
     let temp_dir = TempDir::new().unwrap();
 
     let config = Config {
@@ -31,11 +31,11 @@ async fn test_export_metrics_ref_with_valid_resource_metrics() {
 
     let metrics = create_test_metric();
 
-    // Test export_metrics_ref with valid ResourceMetrics
+    // Test export_metrics_arrow with valid ResourceMetrics
     library
-        .export_metrics_ref(&metrics)
+        .export_metrics_arrow(&metrics)
         .await
-        .expect("Failed to export metrics by reference");
+        .expect("Failed to export metrics to Arrow");
 
     // Flush to ensure write completes
     library.flush().await.expect("Failed to flush");
@@ -47,7 +47,7 @@ async fn test_export_metrics_ref_with_valid_resource_metrics() {
 }
 
 #[tokio::test]
-async fn test_export_metrics_ref_functional_equivalence_with_export_metrics() {
+async fn test_export_metrics_arrow_functional_equivalence_with_export_metrics() {
     let temp_dir = TempDir::new().unwrap();
 
     let config = Config {
@@ -67,17 +67,17 @@ async fn test_export_metrics_ref_functional_equivalence_with_export_metrics() {
     let metrics1 = create_test_metric();
     let metrics2 = create_test_metric();
 
-    // Export using owned method
+    // Export using export_metrics_arrow (direct ResourceMetrics to Arrow)
     library1
-        .export_metrics(metrics1)
+        .export_metrics_arrow(&metrics1)
         .await
-        .expect("Failed to export metrics (owned)");
+        .expect("Failed to export metrics to Arrow");
 
-    // Export using reference method
+    // Export using export_metrics_arrow (same method, different instance)
     library2
-        .export_metrics_ref(&metrics2)
+        .export_metrics_arrow(&metrics2)
         .await
-        .expect("Failed to export metrics (reference)");
+        .expect("Failed to export metrics to Arrow");
 
     // Flush both
     library1.flush().await.expect("Failed to flush library1");
@@ -97,7 +97,7 @@ async fn test_export_metrics_ref_functional_equivalence_with_export_metrics() {
 }
 
 #[tokio::test]
-async fn test_export_metrics_ref_with_empty_resource_metrics() {
+async fn test_export_metrics_arrow_with_empty_resource_metrics() {
     let temp_dir = TempDir::new().unwrap();
 
     let config = Config {
@@ -117,12 +117,12 @@ async fn test_export_metrics_ref_with_empty_resource_metrics() {
     let empty_metrics = ResourceMetrics::default();
 
     // Should handle empty metrics gracefully (no-op or success)
-    let result = library.export_metrics_ref(&empty_metrics).await;
+    let result = library.export_metrics_arrow(&empty_metrics).await;
     assert!(result.is_ok(), "Empty metrics should be handled gracefully");
 }
 
 #[tokio::test]
-async fn test_export_metrics_ref_concurrent_calls() {
+async fn test_export_metrics_arrow_concurrent_calls() {
     let temp_dir = TempDir::new().unwrap();
 
     let config = Config {
@@ -145,7 +145,7 @@ async fn test_export_metrics_ref_concurrent_calls() {
         let lib = library_arc.clone();
         let metrics = create_test_metric();
         handles.push(tokio::spawn(async move {
-            lib.export_metrics_ref(&metrics).await
+            lib.export_metrics_arrow(&metrics).await
         }));
     }
 
@@ -154,7 +154,7 @@ async fn test_export_metrics_ref_concurrent_calls() {
         let result = handle.await.expect("Task should complete");
         assert!(
             result.is_ok(),
-            "Concurrent export_metrics_ref calls should succeed"
+            "Concurrent export_metrics_arrow calls should succeed"
         );
     }
 

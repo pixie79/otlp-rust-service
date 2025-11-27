@@ -27,6 +27,10 @@ const template = () => `
         <input type="checkbox" name="errorOnly" />
         Errors only
       </label>
+      <label class="checkbox">
+        <input type="checkbox" name="liveTail" id="live-tail-toggle" />
+        Live Tail
+      </label>
     </div>
   </form>
 `;
@@ -47,6 +51,7 @@ export class TraceFilter {
     this.container = container;
     this.container.classList.add('trace-filter');
     this.onChange = () => {};
+    this.onLiveTailToggle = () => {};
     this._filters = {
       traceId: '',
       serviceName: '',
@@ -54,6 +59,7 @@ export class TraceFilter {
       minDuration: null,
       maxDuration: null,
       errorOnly: false,
+      liveTail: false,
     };
     this._render();
   }
@@ -64,6 +70,15 @@ export class TraceFilter {
     this.form.addEventListener('submit', (event) => event.preventDefault());
     this.form.addEventListener('input', () => this._handleChange());
     this.form.addEventListener('change', () => this._handleChange());
+    
+    // Handle live tail toggle separately
+    const liveTailToggle = this.container.querySelector('#live-tail-toggle');
+    if (liveTailToggle) {
+      liveTailToggle.addEventListener('change', (e) => {
+        this._filters.liveTail = e.target.checked;
+        this.onLiveTailToggle?.(e.target.checked);
+      });
+    }
   }
 
   _handleChange() {
@@ -74,6 +89,7 @@ export class TraceFilter {
       minDuration: parseNumber(this.form.elements.minDuration.value),
       maxDuration: parseNumber(this.form.elements.maxDuration.value),
       errorOnly: this.form.elements.errorOnly.checked,
+      liveTail: this.form.elements.liveTail?.checked ?? false,
     };
     this.onChange?.(this.getFilters());
   }

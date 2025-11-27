@@ -7,9 +7,9 @@ use crate::error::OtlpError;
 use crate::otlp::OtlpFileExporter;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::{
-    flight_service_server::{FlightService, FlightServiceServer},
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
+    flight_service_server::{FlightService, FlightServiceServer},
 };
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::SpanData;
@@ -168,24 +168,26 @@ impl FlightService for OtlpFlightServiceImpl {
                     if let Ok(Some(protobuf_request)) =
                         converter.arrow_flight_to_protobuf_metrics(&batch)
                     {
-                        // Convert protobuf to ResourceMetrics for export
-                        if let Ok(Some(metrics)) =
-                            crate::otlp::server::convert_metrics_request_to_resource_metrics(
-                                &protobuf_request,
-                            )
+                        // Export directly from protobuf (no ResourceMetrics conversion needed)
+                        if let Err(e) = file_exporter
+                            .export_metrics_from_protobuf(&protobuf_request)
+                            .await
                         {
-                            if let Err(e) = file_exporter.export_metrics(&metrics).await {
-                                error!("Failed to export metrics from Arrow Flight: {}", e);
-                            }
+                            error!("Failed to export metrics from Arrow Flight: {}", e);
                         }
                         continue;
                     }
 
-                    // Fallback: try direct conversion (for backward compatibility)
-                    if let Ok(Some(metrics)) = convert_arrow_batch_to_resource_metrics(&batch) {
-                        if let Err(e) = file_exporter.export_metrics(&metrics).await {
-                            error!("Failed to export metrics from Arrow Flight: {}", e);
-                        }
+                    // Fallback: try direct conversion to ResourceMetrics
+                    // Note: ResourceMetrics has private fields, so we can't convert it directly
+                    // This path is not fully implemented - Arrow Flight metrics should be
+                    // converted to Protobuf format instead
+                    if let Ok(Some(_metrics)) = convert_arrow_batch_to_resource_metrics(&batch) {
+                        // ResourceMetrics conversion is not supported without proxy
+                        // Arrow Flight metrics should be handled via Protobuf conversion path
+                        warn!(
+                            "Arrow Flight metrics conversion to ResourceMetrics not fully supported - use Protobuf path"
+                        );
                         continue;
                     }
 
@@ -252,10 +254,10 @@ pub(crate) fn convert_arrow_batch_to_spans(
     batch: &RecordBatch,
 ) -> Result<Vec<SpanData>, anyhow::Error> {
     use arrow::array::*;
+    use opentelemetry::KeyValue;
     use opentelemetry::trace::{
         SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
     };
-    use opentelemetry::KeyValue;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     let schema = batch.schema();

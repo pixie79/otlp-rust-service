@@ -36,9 +36,9 @@ async fn test_public_api_metrics_export() {
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();
     
-    // Export metrics using public API
+    // Export metrics using public API (export_metrics_arrow for ResourceMetrics)
     let metrics = create_test_metric();
-    library.export_metrics(metrics).await.expect("Failed to export metrics");
+    library.export_metrics_arrow(&metrics).await.expect("Failed to export metrics");
     
     // Wait for batch write
     sleep(Duration::from_secs(2)).await;

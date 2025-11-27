@@ -4,12 +4,12 @@
 //! and public API methods for end-to-end testing.
 
 use opentelemetry_proto::tonic::collector::metrics::v1::{
-    metrics_service_server::{MetricsService, MetricsServiceServer},
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+    metrics_service_server::{MetricsService, MetricsServiceServer},
 };
 use opentelemetry_proto::tonic::collector::trace::v1::{
-    trace_service_server::{TraceService, TraceServiceServer},
     ExportTraceServiceRequest, ExportTraceServiceResponse,
+    trace_service_server::{TraceService, TraceServiceServer},
 };
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::SpanData;
@@ -23,9 +23,9 @@ use tracing::info;
 // Re-export Arrow Flight types for mock service
 use arrow::record_batch::RecordBatch;
 use arrow_flight::{
-    flight_service_server::{FlightService, FlightServiceServer},
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
+    flight_service_server::{FlightService, FlightServiceServer},
 };
 use std::pin::Pin;
 use tokio_stream::{Stream, StreamExt};

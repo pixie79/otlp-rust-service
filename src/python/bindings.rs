@@ -6,12 +6,11 @@
 
 use crate::api::public::OtlpLibrary;
 use crate::config::{Config, ConfigBuilder};
-use crate::otlp::{OtlpMetricExporter, OtlpSpanExporter};
+use crate::otlp::OtlpSpanExporter;
+use opentelemetry::KeyValue;
 use opentelemetry::trace::{
     SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId, TraceState,
 };
-use opentelemetry::KeyValue;
-use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::SpanData;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -130,31 +129,37 @@ impl PyOtlpLibrary {
     /// Args:
     ///     metrics_dict: Dictionary with metrics data
     ///
-    /// Note: Full metrics conversion is complex. This creates a minimal ResourceMetrics.
+    /// Note: Full metrics conversion is complex. This creates a minimal Protobuf request.
+    /// For ResourceMetrics, use export_metrics_arrow instead.
     pub fn export_metrics(&self, _metrics_dict: &PyDict) -> PyResult<()> {
-        // Create a minimal ResourceMetrics
-        // Full implementation would parse the dict and create proper metrics
-        let metrics = ResourceMetrics::default();
+        // Create a minimal Protobuf request
+        // Full implementation would parse the dict and create proper protobuf request
+        use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+        let request = ExportMetricsServiceRequest::default();
         let library = self.library.clone();
         self.runtime
-            .block_on(async move { library.export_metrics(metrics).await })
+            .block_on(async move { library.export_metrics(request).await })
             .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
     }
 
-    /// Export metrics by reference from a Python dictionary
+    /// Export metrics to Arrow format from a Python dictionary
     ///
     /// Args:
     ///     metrics_dict: Dictionary with metrics data
     ///
-    /// Note: This method uses the reference-based export internally for efficiency.
-    /// Full metrics conversion is complex. This creates a minimal ResourceMetrics.
-    pub fn export_metrics_ref(&self, _metrics_dict: &PyDict) -> PyResult<()> {
-        // Create a minimal ResourceMetrics
-        // Full implementation would parse the dict and create proper metrics
-        let metrics = ResourceMetrics::default();
+    /// Note: This method exports metrics via Protobuf format.
+    /// Users should convert ResourceMetrics to Protobuf using opentelemetry-otlp exporter,
+    /// then call export_metrics(protobuf). For now, this creates a minimal Protobuf request.
+    pub fn export_metrics_arrow(&self, _metrics_dict: &PyDict) -> PyResult<()> {
+        // Create a minimal Protobuf request
+        // Full implementation would parse the dict and create proper protobuf request
+        // Users should use opentelemetry-otlp exporter to convert ResourceMetrics to Protobuf,
+        // then call export_metrics(protobuf) directly
+        use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+        let request = ExportMetricsServiceRequest::default();
         let library = self.library.clone();
         self.runtime
-            .block_on(async move { library.export_metrics_ref(&metrics).await })
+            .block_on(async move { library.export_metrics(request).await })
             .map_err(|e| PyRuntimeError::new_err(format!("Export error: {}", e)))
     }
 
@@ -172,24 +177,6 @@ impl PyOtlpLibrary {
         self.runtime
             .block_on(async move { library.shutdown().await })
             .map_err(|e| PyRuntimeError::new_err(format!("Shutdown error: {}", e)))
-    }
-
-    /// Create a PushMetricExporter implementation for use with OpenTelemetry SDK
-    ///
-    /// Returns:
-    ///     PyOtlpMetricExporter: A metric exporter that can be used with OpenTelemetry SDK
-    ///
-    /// Example:
-    ///     ```python
-    ///     library = PyOtlpLibrary(output_dir="/tmp/otlp")
-    ///     metric_exporter = library.metric_exporter()
-    ///     # Use metric_exporter with OpenTelemetry SDK
-    ///     ```
-    pub fn metric_exporter(&self) -> PyResult<PyOtlpMetricExporter> {
-        let exporter = self.library.metric_exporter();
-        Ok(PyOtlpMetricExporter {
-            exporter: Arc::new(exporter),
-        })
     }
 
     /// Create a SpanExporter implementation for use with OpenTelemetry SDK
@@ -405,25 +392,6 @@ fn dict_to_span_data(dict: &PyDict) -> PyResult<SpanData> {
     })
 }
 
-/// Python wrapper for OtlpMetricExporter
-///
-/// This wrapper exposes the OtlpMetricExporter to Python code.
-/// The exporter field is kept for future use when Python OpenTelemetry SDK integration
-/// is implemented (tracked in Issue #6).
-#[pyclass]
-pub struct PyOtlpMetricExporter {
-    #[allow(dead_code)]
-    exporter: Arc<OtlpMetricExporter>,
-}
-
-#[pymethods]
-impl PyOtlpMetricExporter {
-    /// Get a string representation of the exporter
-    fn __repr__(&self) -> String {
-        "PyOtlpMetricExporter".to_string()
-    }
-}
-
 /// Python wrapper for OtlpSpanExporter
 ///
 /// This wrapper exposes the OtlpSpanExporter to Python code.
@@ -447,7 +415,6 @@ impl PyOtlpSpanExporter {
 #[pymodule]
 fn otlp_arrow_library(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOtlpLibrary>()?;
-    m.add_class::<PyOtlpMetricExporter>()?;
     m.add_class::<PyOtlpSpanExporter>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())

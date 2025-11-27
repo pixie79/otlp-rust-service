@@ -1,8 +1,8 @@
 //! Unit tests for OtlpMetricExporter
 
+use opentelemetry_sdk::metrics::Temporality;
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::metrics::exporter::PushMetricExporter;
-use opentelemetry_sdk::metrics::Temporality;
 use otlp_arrow_library::{Config, OtlpLibrary};
 use std::path::PathBuf;
 use std::time::Duration;

@@ -78,7 +78,7 @@ async fn test_default_metric_cleanup_interval() {
     
     // Export metrics (using default ResourceMetrics)
     let metrics = ResourceMetrics::default();
-    library.export_metrics(metrics).await.unwrap();
+    library.export_metrics_arrow(&metrics).await.unwrap();
     
     // Flush to ensure write
     library.flush().await.unwrap();
