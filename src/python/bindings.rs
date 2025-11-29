@@ -192,7 +192,6 @@ impl PyOtlpLibrary {
         })
     }
 
-<<<<<<< HEAD
     /// Create a PushMetricExporter implementation for use with OpenTelemetry SDK
     ///
     /// Returns:
