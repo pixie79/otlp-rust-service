@@ -207,31 +207,21 @@ jobs:
           .venv/bin/python -c "import otlp_arrow_library; print('Module available:', otlp_arrow_library.__file__)" || (echo "ERROR: Module not found in venv" && exit 1)
           .venv/bin/pip install pytest opentelemetry-api opentelemetry-sdk
           # Run Python tests - handle segfault during cleanup as acceptable if tests passed
+          # Note: macOS doesn't have 'timeout' command, so we rely on step-level timeout-minutes
           if [ -n "$(find tests/python -name 'test_*.py' -type f 2>/dev/null)" ]; then
-            # Run pytest with timeout to prevent hanging
-            # Use timeout command to kill process if it hangs after segfault
+            # Run pytest - rely on step-level timeout to prevent hanging
             set +e  # Don't exit on error immediately
-            timeout 300 .venv/bin/pytest tests/python/ -v --tb=short 2>&1 | tee /tmp/pytest_output.log
+            .venv/bin/pytest tests/python/ -v --tb=short 2>&1 | tee /tmp/pytest_output.log
             EXIT_CODE=${PIPESTATUS[0]}
             set -e  # Re-enable exit on error
             
-            # Check if timeout was hit
-            if [ $EXIT_CODE -eq 124 ]; then
-              echo "⚠️  Pytest timed out (likely hung after segfault)"
-              echo "   Checking test results from output..."
-              if grep -q "FAILED" /tmp/pytest_output.log; then
-                echo "❌ Tests failed before timeout"
-                exit 1
-              else
-                echo "✅ Tests appear to have passed before timeout/hang"
-                echo "   This is likely a segfault during cleanup causing hang"
-                exit 0
-              fi
-            elif [ $EXIT_CODE -eq 139 ]; then
+            if [ $EXIT_CODE -eq 139 ]; then
               echo "⚠️  Segfault during pytest cleanup (exit code 139)"
               echo "   Checking if tests actually passed..."
-              # Re-run with minimal output to check test results (with timeout)
-              timeout 60 .venv/bin/pytest tests/python/ -v --tb=no -q 2>&1 | grep -q "FAILED" && TEST_FAILED=1 || TEST_FAILED=0
+              # Re-run with minimal output to check test results
+              set +e
+              .venv/bin/pytest tests/python/ -v --tb=no -q 2>&1 | grep -q "FAILED" && TEST_FAILED=1 || TEST_FAILED=0
+              set -e
               if [ $TEST_FAILED -eq 1 ]; then
                 echo "❌ Tests failed, exiting with error"
                 exit 1
