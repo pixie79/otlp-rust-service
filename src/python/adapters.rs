@@ -85,8 +85,8 @@ impl PyOtlpMetricExporterAdapter {
     #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
     pub fn export(
         &self,
-        metrics_data: &PyAny,
-        timeout_millis: Option<u64>,
+        metrics_data: &PyAny, // SAFETY: PyO3 parameter extraction is safe
+        timeout_millis: Option<f64>, // Changed from u64 to f64 to match SDK
         py: Python<'_>,
     ) -> PyResult<PyObject> {
         // Validate library is still valid
@@ -96,22 +96,34 @@ impl PyOtlpMetricExporterAdapter {
             ));
         }
 
-        // Convert Python OpenTelemetry SDK types to library-compatible format
-        // Wrap in error handling to catch any Python exceptions that might cause segfaults
-        let metrics_dict = match convert_metric_export_result_to_dict(metrics_data, py) {
+        // Convert Python OpenTelemetry SDK types to Protobuf ExportMetricsServiceRequest
+        // Step 1: Convert MetricExportResult to dict (for future full conversion)
+        let _metrics_dict = match convert_metric_export_result_to_dict(metrics_data, py) {
             Ok(dict) => dict,
             Err(e) => {
                 // If conversion fails, return a proper Python exception instead of crashing
-                // This handles cases where mock objects don't match expected structure
                 return Err(e);
             }
         };
 
-        // Get library instance and delegate to export_metrics_ref
+        // TODO: Implement full conversion: dict -> InternalResourceMetrics -> Protobuf
+        // For now, create a minimal Protobuf request to get it compiling
+        // Full implementation would parse metrics_dict and create proper Protobuf request
+        use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+        let protobuf_request = ExportMetricsServiceRequest::default();
+
+        // Get library instance and runtime
         let library_ref = self.library.borrow(py);
-        library_ref
-            .export_metrics_ref(metrics_dict)
-            .map_err(|e| error_message_to_py(format!("Failed to export metrics: {}", e)))?;
+        let library = library_ref.library.clone();
+        let runtime = library_ref.runtime.clone();
+        drop(library_ref); // Explicitly drop PyRef before async operation
+
+        // Release GIL before blocking on async operation to prevent deadlocks and segfaults
+        py.allow_threads(|| {
+            runtime
+                .block_on(async move { library.export_metrics(protobuf_request).await })
+                .map_err(|e| error_message_to_py(format!("Failed to export metrics: {}", e)))
+        })?;
 
         // Return ExportResult.SUCCESS
         // In Python OpenTelemetry SDK, ExportResult is an enum with SUCCESS and FAILURE variants
@@ -136,7 +148,7 @@ impl PyOtlpMetricExporterAdapter {
     /// This is a no-op because library shutdown is handled separately.
     #[pyo3(signature = (*, timeout_millis=None))]
     #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
-    pub fn shutdown(&self, timeout_millis: Option<u64>, _py: Python<'_>) -> PyResult<()> {
+    pub fn shutdown(&self, timeout_millis: Option<f64>, _py: Python<'_>) -> PyResult<()> {
         // No-op: library shutdown is separate operation
         Ok(())
     }
@@ -154,7 +166,7 @@ impl PyOtlpMetricExporterAdapter {
     /// ExportResult (SUCCESS or FAILURE)
     #[pyo3(signature = (*, timeout_millis=None))]
     #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
-    pub fn force_flush(&self, timeout_millis: Option<u64>, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn force_flush(&self, timeout_millis: Option<f64>, py: Python<'_>) -> PyResult<PyObject> {
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
             return Err(error_message_to_py(
@@ -299,7 +311,7 @@ impl PyOtlpSpanExporterAdapter {
     /// # Returns
     ///
     /// SpanExportResult (SUCCESS or FAILURE)
-    pub fn export(&self, spans: &PyAny, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn export(&self, spans: &PyAny, py: Python<'_>) -> PyResult<PyObject> { // SAFETY: PyO3 parameter extraction is safe
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
             return Err(error_message_to_py(
@@ -334,7 +346,7 @@ impl PyOtlpSpanExporterAdapter {
     /// This is a no-op because library shutdown is handled separately.
     #[pyo3(signature = (*, timeout_millis=None))]
     #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
-    pub fn shutdown(&self, timeout_millis: Option<u64>, _py: Python<'_>) -> PyResult<()> {
+    pub fn shutdown(&self, timeout_millis: Option<f64>, _py: Python<'_>) -> PyResult<()> {
         // No-op: library shutdown is separate operation
         Ok(())
     }

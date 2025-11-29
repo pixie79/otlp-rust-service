@@ -192,24 +192,6 @@ impl PyOtlpLibrary {
         })
     }
 
-    /// Create a PushMetricExporter implementation for use with OpenTelemetry SDK
-    ///
-    /// Returns:
-    ///     PyOtlpMetricExporter: A metric exporter that can be used with OpenTelemetry SDK
-    ///
-    /// Example:
-    ///     ```python
-    ///     library = PyOtlpLibrary(output_dir="/tmp/otlp")
-    ///     metric_exporter = library.metric_exporter()
-    ///     # Use metric_exporter with OpenTelemetry SDK
-    ///     ```
-    pub fn metric_exporter(&self) -> PyResult<PyOtlpMetricExporter> {
-        let exporter = self.library.metric_exporter();
-        Ok(PyOtlpMetricExporter {
-            exporter: Arc::new(exporter),
-        })
-    }
-
     /// Create a Python OpenTelemetry SDK MetricExporter adapter
     ///
     /// Returns a Python class that implements Python OpenTelemetry SDK's MetricExporter
