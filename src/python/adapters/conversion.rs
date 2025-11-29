@@ -191,13 +191,13 @@ pub fn convert_metric_export_result_to_dict<'py>(
         resource.getattr("attributes").ok()
     };
 
-    if let Some(attributes) = attributes {
-        if let Ok(attrs_dict) = attributes.downcast::<PyDict>() {
-            for (key, value) in attrs_dict.iter() {
-                if let Err(e) = resource_dict.set_item(key, value) {
-                    // Log warning but continue - some values might not be settable
-                    warn!("Failed to set resource attribute: {:?}", e);
-                }
+    if let Some(attributes) = attributes
+        && let Ok(attrs_dict) = attributes.downcast::<PyDict>()
+    {
+        for (key, value) in attrs_dict.iter() {
+            if let Err(e) = resource_dict.set_item(key, value) {
+                // Log warning but continue - some values might not be settable
+                warn!("Failed to set resource attribute: {:?}", e);
             }
         }
     }
@@ -253,10 +253,8 @@ pub fn convert_metric_export_result_to_dict<'py>(
                 } else {
                     scope.getattr("name").ok()
                 };
-                if let Some(name) = name {
-                    if !name.is_none() {
-                        let _ = scope_dict.set_item("name", name);
-                    }
+                if let Some(name) = name && !name.is_none() {
+                    let _ = scope_dict.set_item("name", name);
                 }
 
                 let version = if let Ok(d) = scope.downcast::<PyDict>() {
@@ -264,10 +262,8 @@ pub fn convert_metric_export_result_to_dict<'py>(
                 } else {
                     scope.getattr("version").ok()
                 };
-                if let Some(version) = version {
-                    if !version.is_none() {
-                        let _ = scope_dict.set_item("version", version);
-                    }
+                if let Some(version) = version && !version.is_none() {
+                    let _ = scope_dict.set_item("version", version);
                 }
                 let _ = scope_metric_dict.set_item("scope", scope_dict);
             }
@@ -300,10 +296,8 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         } else {
                             metric.getattr("name").ok()
                         };
-                        if let Some(name) = name {
-                            if !name.is_none() {
-                                let _ = metric_dict.set_item("name", name);
-                            }
+                        if let Some(name) = name && !name.is_none() {
+                            let _ = metric_dict.set_item("name", name);
                         }
 
                         let description = if let Ok(d) = metric.downcast::<PyDict>() {
@@ -311,10 +305,8 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         } else {
                             metric.getattr("description").ok()
                         };
-                        if let Some(description) = description {
-                            if !description.is_none() {
-                                let _ = metric_dict.set_item("description", description);
-                            }
+                        if let Some(description) = description && !description.is_none() {
+                            let _ = metric_dict.set_item("description", description);
                         }
 
                         let unit = if let Ok(d) = metric.downcast::<PyDict>() {
@@ -322,10 +314,8 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         } else {
                             metric.getattr("unit").ok()
                         };
-                        if let Some(unit) = unit {
-                            if !unit.is_none() {
-                                let _ = metric_dict.set_item("unit", unit);
-                            }
+                        if let Some(unit) = unit && !unit.is_none() {
+                            let _ = metric_dict.set_item("unit", unit);
                         }
 
                         let data = if let Ok(d) = metric.downcast::<PyDict>() {
@@ -333,10 +323,8 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         } else {
                             metric.getattr("data").ok()
                         };
-                        if let Some(data) = data {
-                            if !data.is_none() {
-                                let _ = metric_dict.set_item("data", data);
-                            }
+                        if let Some(data) = data && !data.is_none() {
+                            let _ = metric_dict.set_item("data", data);
                         }
 
                         let _ = metrics_list.append(metric_dict);
@@ -423,19 +411,16 @@ pub fn convert_readable_span_to_dict<'py>(
     result.set_item("span_id", PyBytes::new(py, &span_id_bytes))?;
 
     // Extract parent span_id (optional)
-    if let Ok(parent) = span.getattr("parent") {
-        if !parent.is_none() {
-            if let Ok(parent_context) = parent.getattr("context") {
-                if let Ok(parent_span_id) = parent_context.getattr("span_id") {
-                    if let Ok(parent_span_id_val) = parent_span_id.extract::<u64>() {
-                        let parent_span_id_bytes: Vec<u8> =
-                            parent_span_id_val.to_be_bytes().to_vec();
-                        result
-                            .set_item("parent_span_id", PyBytes::new(py, &parent_span_id_bytes))?;
-                    }
-                }
-            }
-        }
+    if let Ok(parent) = span.getattr("parent")
+        && !parent.is_none()
+        && let Ok(parent_context) = parent.getattr("context")
+        && let Ok(parent_span_id) = parent_context.getattr("span_id")
+        && let Ok(parent_span_id_val) = parent_span_id.extract::<u64>()
+    {
+        let parent_span_id_bytes: Vec<u8> =
+            parent_span_id_val.to_be_bytes().to_vec();
+        result
+            .set_item("parent_span_id", PyBytes::new(py, &parent_span_id_bytes))?;
     }
 
     // Extract name
@@ -455,82 +440,82 @@ pub fn convert_readable_span_to_dict<'py>(
     }
 
     // Extract attributes
-    if let Ok(attributes) = span.getattr("attributes") {
-        if let Ok(attrs_dict) = attributes.downcast::<PyDict>() {
-            result.set_item("attributes", attrs_dict)?;
-        }
+    if let Ok(attributes) = span.getattr("attributes")
+        && let Ok(attrs_dict) = attributes.downcast::<PyDict>()
+    {
+        result.set_item("attributes", attrs_dict)?;
     }
 
     // Extract events
-    if let Ok(events) = span.getattr("events") {
-        if let Ok(events_list) = events.downcast::<PyList>() {
-            let events_dict_list = PyList::empty(py);
-            for event in events_list.iter() {
-                let event_dict = PyDict::new(py);
-                if let Ok(name) = event.getattr("name") {
-                    event_dict.set_item("name", name)?;
-                }
-                if let Ok(timestamp) = event.getattr("timestamp") {
-                    event_dict.set_item("timestamp", timestamp)?;
-                }
-                if let Ok(event_attrs) = event.getattr("attributes") {
-                    if let Ok(event_attrs_dict) = event_attrs.downcast::<PyDict>() {
-                        event_dict.set_item("attributes", event_attrs_dict)?;
-                    }
-                }
-                events_dict_list.append(event_dict)?;
+    if let Ok(events) = span.getattr("events")
+        && let Ok(events_list) = events.downcast::<PyList>()
+    {
+        let events_dict_list = PyList::empty(py);
+        for event in events_list.iter() {
+            let event_dict = PyDict::new(py);
+            if let Ok(name) = event.getattr("name") {
+                event_dict.set_item("name", name)?;
             }
-            result.set_item("events", events_dict_list)?;
+            if let Ok(timestamp) = event.getattr("timestamp") {
+                event_dict.set_item("timestamp", timestamp)?;
+            }
+            if let Ok(event_attrs) = event.getattr("attributes")
+                && let Ok(event_attrs_dict) = event_attrs.downcast::<PyDict>()
+            {
+                event_dict.set_item("attributes", event_attrs_dict)?;
+            }
+            events_dict_list.append(event_dict)?;
         }
+        result.set_item("events", events_dict_list)?;
     }
 
     // Extract links
-    if let Ok(links) = span.getattr("links") {
-        if let Ok(links_list) = links.downcast::<PyList>() {
-            let links_dict_list = PyList::empty(py);
-            for link in links_list.iter() {
-                let link_dict = PyDict::new(py);
-                if let Ok(link_context) = link.getattr("context") {
-                    if let Ok(link_trace_id) = link_context.getattr("trace_id") {
-                        if let Ok(link_trace_id_val) = link_trace_id.extract::<u128>() {
-                            let link_trace_id_bytes: Vec<u8> =
-                                link_trace_id_val.to_be_bytes().to_vec();
-                            link_dict
-                                .set_item("trace_id", PyBytes::new(py, &link_trace_id_bytes))?;
-                        }
-                    }
-                    if let Ok(link_span_id) = link_context.getattr("span_id") {
-                        if let Ok(link_span_id_val) = link_span_id.extract::<u64>() {
-                            let link_span_id_bytes: Vec<u8> =
-                                link_span_id_val.to_be_bytes().to_vec();
-                            link_dict.set_item("span_id", PyBytes::new(py, &link_span_id_bytes))?;
-                        }
-                    }
+    if let Ok(links) = span.getattr("links")
+        && let Ok(links_list) = links.downcast::<PyList>()
+    {
+        let links_dict_list = PyList::empty(py);
+        for link in links_list.iter() {
+            let link_dict = PyDict::new(py);
+            if let Ok(link_context) = link.getattr("context") {
+                if let Ok(link_trace_id) = link_context.getattr("trace_id")
+                    && let Ok(link_trace_id_val) = link_trace_id.extract::<u128>()
+                {
+                    let link_trace_id_bytes: Vec<u8> =
+                        link_trace_id_val.to_be_bytes().to_vec();
+                    link_dict
+                        .set_item("trace_id", PyBytes::new(py, &link_trace_id_bytes))?;
                 }
-                if let Ok(link_attrs) = link.getattr("attributes") {
-                    if let Ok(link_attrs_dict) = link_attrs.downcast::<PyDict>() {
-                        link_dict.set_item("attributes", link_attrs_dict)?;
-                    }
+                if let Ok(link_span_id) = link_context.getattr("span_id")
+                    && let Ok(link_span_id_val) = link_span_id.extract::<u64>()
+                {
+                    let link_span_id_bytes: Vec<u8> =
+                        link_span_id_val.to_be_bytes().to_vec();
+                    link_dict.set_item("span_id", PyBytes::new(py, &link_span_id_bytes))?;
                 }
-                links_dict_list.append(link_dict)?;
             }
-            result.set_item("links", links_dict_list)?;
+            if let Ok(link_attrs) = link.getattr("attributes")
+                && let Ok(link_attrs_dict) = link_attrs.downcast::<PyDict>()
+            {
+                link_dict.set_item("attributes", link_attrs_dict)?;
+            }
+            links_dict_list.append(link_dict)?;
         }
+        result.set_item("links", links_dict_list)?;
     }
 
     // Extract status
     if let Ok(status) = span.getattr("status") {
-        if let Ok(status_code) = status.getattr("status_code") {
-            if let Ok(code_name) = status_code.getattr("name") {
-                let status_name: String =
-                    code_name.extract().unwrap_or_else(|_| "UNSET".to_string());
-                result.set_item("status", status_name.to_lowercase())?;
-            }
+        if let Ok(status_code) = status.getattr("status_code")
+            && let Ok(code_name) = status_code.getattr("name")
+        {
+            let status_name: String =
+                code_name.extract().unwrap_or_else(|_| "UNSET".to_string());
+            result.set_item("status", status_name.to_lowercase())?;
         }
-        if let Ok(status_message) = status.getattr("status_message") {
-            if !status_message.is_none() {
-                result.set_item("status_message", status_message)?;
-            }
+        if let Ok(status_message) = status.getattr("status_message")
+            && !status_message.is_none()
+        {
+            result.set_item("status_message", status_message)?;
         }
     }
 

@@ -4,7 +4,7 @@
 //! exporter interfaces, enabling seamless integration between Python OpenTelemetry SDK
 //! and OtlpLibrary without requiring custom adapter code.
 
-#![allow(non_local_definitions)] // pyo3 pymethods macro generates non-local impl blocks
+#![allow(non_local_definitions, unsafe_op_in_unsafe_fn)] // pyo3 pymethods macro generates non-local impl blocks; PyO3 parameter extraction is safe
 
 pub mod conversion;
 
@@ -82,7 +82,7 @@ impl PyOtlpMetricExporterAdapter {
     ///
     /// ExportResult (SUCCESS or FAILURE)
     #[pyo3(signature = (metrics_data, *, timeout_millis=None))]
-    #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
+    #[allow(unused_variables, unsafe_op_in_unsafe_fn)] // timeout_millis is part of SDK interface but not used; PyO3 parameter extraction is safe
     pub fn export(
         &self,
         metrics_data: &PyAny,        // SAFETY: PyO3 parameter extraction is safe
@@ -311,7 +311,8 @@ impl PyOtlpSpanExporterAdapter {
     /// # Returns
     ///
     /// SpanExportResult (SUCCESS or FAILURE)
-    pub fn export(&self, spans: &PyAny, py: Python<'_>) -> PyResult<PyObject> {
+    #[allow(unsafe_op_in_unsafe_fn)] // PyO3 parameter extraction is safe
+    pub fn export(&self, spans: &PyAny, py: Python<'_>) -> PyResult<PyObject> { // SAFETY: PyO3 parameter extraction is safe
         // SAFETY: PyO3 parameter extraction is safe
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
