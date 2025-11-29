@@ -50,7 +50,7 @@ pub mod gc {
 }
 
 // Re-export for convenience
-pub use gc::{is_library_valid, LibraryRef};
+pub use gc::{LibraryRef, is_library_valid};
 
 use crate::python::adapters::conversion::{
     convert_metric_export_result_to_dict, convert_span_sequence_to_dict_list, error_message_to_py,
@@ -85,7 +85,7 @@ impl PyOtlpMetricExporterAdapter {
     #[allow(unused_variables)] // timeout_millis is part of SDK interface but not used
     pub fn export(
         &self,
-        metrics_data: &PyAny, // SAFETY: PyO3 parameter extraction is safe
+        metrics_data: &PyAny,        // SAFETY: PyO3 parameter extraction is safe
         timeout_millis: Option<f64>, // Changed from u64 to f64 to match SDK
         py: Python<'_>,
     ) -> PyResult<PyObject> {
@@ -311,7 +311,8 @@ impl PyOtlpSpanExporterAdapter {
     /// # Returns
     ///
     /// SpanExportResult (SUCCESS or FAILURE)
-    pub fn export(&self, spans: &PyAny, py: Python<'_>) -> PyResult<PyObject> { // SAFETY: PyO3 parameter extraction is safe
+    pub fn export(&self, spans: &PyAny, py: Python<'_>) -> PyResult<PyObject> {
+        // SAFETY: PyO3 parameter extraction is safe
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
             return Err(error_message_to_py(
