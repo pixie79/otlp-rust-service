@@ -253,7 +253,9 @@ pub fn convert_metric_export_result_to_dict<'py>(
                 } else {
                     scope.getattr("name").ok()
                 };
-                if let Some(name) = name && !name.is_none() {
+                if let Some(name) = name
+                    && !name.is_none()
+                {
                     let _ = scope_dict.set_item("name", name);
                 }
 
@@ -262,7 +264,9 @@ pub fn convert_metric_export_result_to_dict<'py>(
                 } else {
                     scope.getattr("version").ok()
                 };
-                if let Some(version) = version && !version.is_none() {
+                if let Some(version) = version
+                    && !version.is_none()
+                {
                     let _ = scope_dict.set_item("version", version);
                 }
                 let _ = scope_metric_dict.set_item("scope", scope_dict);
@@ -296,7 +300,9 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         } else {
                             metric.getattr("name").ok()
                         };
-                        if let Some(name) = name && !name.is_none() {
+                        if let Some(name) = name
+                            && !name.is_none()
+                        {
                             let _ = metric_dict.set_item("name", name);
                         }
 
@@ -305,7 +311,9 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         } else {
                             metric.getattr("description").ok()
                         };
-                        if let Some(description) = description && !description.is_none() {
+                        if let Some(description) = description
+                            && !description.is_none()
+                        {
                             let _ = metric_dict.set_item("description", description);
                         }
 
@@ -314,7 +322,9 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         } else {
                             metric.getattr("unit").ok()
                         };
-                        if let Some(unit) = unit && !unit.is_none() {
+                        if let Some(unit) = unit
+                            && !unit.is_none()
+                        {
                             let _ = metric_dict.set_item("unit", unit);
                         }
 
@@ -323,7 +333,9 @@ pub fn convert_metric_export_result_to_dict<'py>(
                         } else {
                             metric.getattr("data").ok()
                         };
-                        if let Some(data) = data && !data.is_none() {
+                        if let Some(data) = data
+                            && !data.is_none()
+                        {
                             let _ = metric_dict.set_item("data", data);
                         }
 
@@ -417,10 +429,8 @@ pub fn convert_readable_span_to_dict<'py>(
         && let Ok(parent_span_id) = parent_context.getattr("span_id")
         && let Ok(parent_span_id_val) = parent_span_id.extract::<u64>()
     {
-        let parent_span_id_bytes: Vec<u8> =
-            parent_span_id_val.to_be_bytes().to_vec();
-        result
-            .set_item("parent_span_id", PyBytes::new(py, &parent_span_id_bytes))?;
+        let parent_span_id_bytes: Vec<u8> = parent_span_id_val.to_be_bytes().to_vec();
+        result.set_item("parent_span_id", PyBytes::new(py, &parent_span_id_bytes))?;
     }
 
     // Extract name
@@ -480,16 +490,13 @@ pub fn convert_readable_span_to_dict<'py>(
                 if let Ok(link_trace_id) = link_context.getattr("trace_id")
                     && let Ok(link_trace_id_val) = link_trace_id.extract::<u128>()
                 {
-                    let link_trace_id_bytes: Vec<u8> =
-                        link_trace_id_val.to_be_bytes().to_vec();
-                    link_dict
-                        .set_item("trace_id", PyBytes::new(py, &link_trace_id_bytes))?;
+                    let link_trace_id_bytes: Vec<u8> = link_trace_id_val.to_be_bytes().to_vec();
+                    link_dict.set_item("trace_id", PyBytes::new(py, &link_trace_id_bytes))?;
                 }
                 if let Ok(link_span_id) = link_context.getattr("span_id")
                     && let Ok(link_span_id_val) = link_span_id.extract::<u64>()
                 {
-                    let link_span_id_bytes: Vec<u8> =
-                        link_span_id_val.to_be_bytes().to_vec();
+                    let link_span_id_bytes: Vec<u8> = link_span_id_val.to_be_bytes().to_vec();
                     link_dict.set_item("span_id", PyBytes::new(py, &link_span_id_bytes))?;
                 }
             }
@@ -508,8 +515,7 @@ pub fn convert_readable_span_to_dict<'py>(
         if let Ok(status_code) = status.getattr("status_code")
             && let Ok(code_name) = status_code.getattr("name")
         {
-            let status_name: String =
-                code_name.extract().unwrap_or_else(|_| "UNSET".to_string());
+            let status_name: String = code_name.extract().unwrap_or_else(|_| "UNSET".to_string());
             result.set_item("status", status_name.to_lowercase())?;
         }
         if let Ok(status_message) = status.getattr("status_message")

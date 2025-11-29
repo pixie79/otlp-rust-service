@@ -312,7 +312,8 @@ impl PyOtlpSpanExporterAdapter {
     ///
     /// SpanExportResult (SUCCESS or FAILURE)
     #[allow(unsafe_op_in_unsafe_fn)] // PyO3 parameter extraction is safe
-    pub fn export(&self, spans: &PyAny, py: Python<'_>) -> PyResult<PyObject> { // SAFETY: PyO3 parameter extraction is safe
+    pub fn export(&self, spans: &PyAny, py: Python<'_>) -> PyResult<PyObject> {
+        // SAFETY: PyO3 parameter extraction is safe
         // SAFETY: PyO3 parameter extraction is safe
         // Validate library is still valid
         if !is_library_valid(&self.library, py) {
