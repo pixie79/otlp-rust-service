@@ -107,7 +107,9 @@ jobs:
             # Run pytest with timeout to prevent hanging
             # Use timeout command to kill process if it hangs after segfault
             set +e  # Don't exit on error immediately
-            timeout 300 .venv/bin/pytest tests/python/ -v --tb=short 2>&1 | tee /tmp/pytest_output.log
+            # Run pytest with full traceback and capture output
+            # Use --tb=long to see full error messages before segfault
+            timeout 300 .venv/bin/pytest tests/python/ -v --tb=long --capture=no 2>&1 | tee /tmp/pytest_output.log
             EXIT_CODE=${PIPESTATUS[0]}
             set -e  # Re-enable exit on error
             
