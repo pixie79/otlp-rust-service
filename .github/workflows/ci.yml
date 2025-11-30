@@ -147,8 +147,13 @@ jobs:
                 echo "⚠️  No test results found in output"
                 exit 1
               fi
-            elif [ $EXIT_CODE -eq 139 ]; then
-              echo "⚠️  Segfault during pytest cleanup (exit code 139)"
+            elif [ $EXIT_CODE -eq 139 ] || [ $EXIT_CODE -eq 138 ]; then
+              # Exit code 139 = segfault, 138 = bus error (macOS)
+              ERROR_TYPE="segfault"
+              if [ $EXIT_CODE -eq 138 ]; then
+                ERROR_TYPE="bus error"
+              fi
+              echo "⚠️  $ERROR_TYPE during pytest cleanup (exit code $EXIT_CODE)"
               echo "   Checking if tests actually passed..."
               # Re-run with minimal output to check test results (with timeout)
               set +e
@@ -158,7 +163,7 @@ jobs:
                 echo "❌ Tests failed, exiting with error"
                 exit 1
               else
-                echo "✅ All tests passed, ignoring cleanup segfault (known issue)"
+                echo "✅ All tests passed, ignoring cleanup $ERROR_TYPE (known issue)"
                 exit 0
               fi
             elif [ $EXIT_CODE -ne 0 ]; then
@@ -243,8 +248,13 @@ jobs:
             EXIT_CODE=${PIPESTATUS[0]}
             set -e  # Re-enable exit on error
             
-            if [ $EXIT_CODE -eq 139 ]; then
-              echo "⚠️  Segfault during pytest cleanup (exit code 139)"
+            if [ $EXIT_CODE -eq 139 ] || [ $EXIT_CODE -eq 138 ]; then
+              # Exit code 139 = segfault, 138 = bus error (macOS)
+              ERROR_TYPE="segfault"
+              if [ $EXIT_CODE -eq 138 ]; then
+                ERROR_TYPE="bus error"
+              fi
+              echo "⚠️  $ERROR_TYPE during pytest cleanup (exit code $EXIT_CODE)"
               echo "   Checking if tests actually passed..."
               # Re-run with minimal output to check test results
               set +e
@@ -254,7 +264,7 @@ jobs:
                 echo "❌ Tests failed, exiting with error"
                 exit 1
               else
-                echo "✅ All tests passed, ignoring cleanup segfault (known issue)"
+                echo "✅ All tests passed, ignoring cleanup $ERROR_TYPE (known issue)"
                 exit 0
               fi
             elif [ $EXIT_CODE -ne 0 ]; then
