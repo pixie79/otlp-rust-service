@@ -111,23 +111,39 @@ jobs:
             EXIT_CODE=${PIPESTATUS[0]}
             set -e  # Re-enable exit on error
             
+            # Show test summary from output
+            echo ""
+            echo "=== Test Summary ==="
+            grep -E "(PASSED|FAILED|ERROR|SKIPPED)" /tmp/pytest_output.log | tail -20 || true
+            echo ""
+            
             # Check if timeout was hit
             if [ $EXIT_CODE -eq 124 ]; then
               echo "⚠️  Pytest timed out (likely hung after segfault)"
               echo "   Checking test results from output..."
-              if grep -q "FAILED" /tmp/pytest_output.log; then
+              # Count failures and passes
+              FAILED_COUNT=$(grep -c "FAILED" /tmp/pytest_output.log || echo "0")
+              PASSED_COUNT=$(grep -c "PASSED" /tmp/pytest_output.log || echo "0")
+              echo "   Found $FAILED_COUNT failed tests and $PASSED_COUNT passed tests"
+              if [ "$FAILED_COUNT" -gt 0 ]; then
                 echo "❌ Tests failed before timeout"
+                echo "   Showing failed test details:"
+                grep -A 10 "FAILED" /tmp/pytest_output.log | head -50 || true
                 exit 1
-              else
-                echo "✅ Tests appear to have passed before timeout/hang"
-                echo "   This is likely a segfault during cleanup causing hang"
+              elif [ "$PASSED_COUNT" -gt 0 ]; then
+                echo "✅ Tests passed but process hung (likely segfault during cleanup)"
                 exit 0
+              else
+                echo "⚠️  No test results found in output"
+                exit 1
               fi
             elif [ $EXIT_CODE -eq 139 ]; then
               echo "⚠️  Segfault during pytest cleanup (exit code 139)"
               echo "   Checking if tests actually passed..."
               # Re-run with minimal output to check test results (with timeout)
+              set +e
               timeout 60 .venv/bin/pytest tests/python/ -v --tb=no -q 2>&1 | grep -q "FAILED" && TEST_FAILED=1 || TEST_FAILED=0
+              set -e
               if [ $TEST_FAILED -eq 1 ]; then
                 echo "❌ Tests failed, exiting with error"
                 exit 1
@@ -137,6 +153,8 @@ jobs:
               fi
             elif [ $EXIT_CODE -ne 0 ]; then
               echo "❌ Tests failed with exit code $EXIT_CODE"
+              echo "   Showing failed test details:"
+              grep -A 10 "FAILED\|ERROR" /tmp/pytest_output.log | head -50 || true
               exit $EXIT_CODE
             else
               echo "✅ All tests passed"

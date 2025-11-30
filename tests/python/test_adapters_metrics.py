@@ -1,6 +1,7 @@
 """Tests for Python OpenTelemetry SDK metric exporter adapter"""
 
 import tempfile
+import shutil
 import pytest
 
 
@@ -8,7 +9,9 @@ def test_metric_exporter_interface():
     """Test that metric exporter adapter implements required interface"""
     import otlp_arrow_library
     
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # Use mkdtemp instead of TemporaryDirectory to avoid segfault during cleanup
+    tmpdir = tempfile.mkdtemp()
+    try:
         library = otlp_arrow_library.PyOtlpLibrary(
             output_dir=tmpdir,
             write_interval_secs=1
@@ -38,6 +41,8 @@ def test_metric_exporter_interface():
         
         # Cleanup
         library.shutdown()
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def test_metric_exporter_with_real_sdk_data():
@@ -52,7 +57,9 @@ def test_metric_exporter_with_real_sdk_data():
     except ImportError:
         pytest.skip("OpenTelemetry SDK not installed - install with: pip install opentelemetry-api opentelemetry-sdk")
     
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # Use mkdtemp instead of TemporaryDirectory to avoid segfault during cleanup
+    tmpdir = tempfile.mkdtemp()
+    try:
         library = otlp_arrow_library.PyOtlpLibrary(
             output_dir=tmpdir,
             write_interval_secs=1
@@ -98,6 +105,8 @@ def test_metric_exporter_with_real_sdk_data():
             # Cleanup
             meter_provider.shutdown()
             library.shutdown()
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def test_metric_exporter_direct_export():
@@ -112,7 +121,9 @@ def test_metric_exporter_direct_export():
     except ImportError:
         pytest.skip("OpenTelemetry SDK not installed - install with: pip install opentelemetry-api opentelemetry-sdk")
     
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # Use mkdtemp instead of TemporaryDirectory to avoid segfault during cleanup
+    tmpdir = tempfile.mkdtemp()
+    try:
         library = otlp_arrow_library.PyOtlpLibrary(
             output_dir=tmpdir,
             write_interval_secs=1
@@ -152,6 +163,8 @@ def test_metric_exporter_direct_export():
         finally:
             meter_provider.shutdown()
             library.shutdown()
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":

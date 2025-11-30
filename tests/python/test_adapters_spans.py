@@ -1,6 +1,7 @@
 """Tests for Python OpenTelemetry SDK span exporter adapter"""
 
 import tempfile
+import shutil
 import pytest
 
 
@@ -8,7 +9,9 @@ def test_span_exporter_interface():
     """Test that span exporter adapter implements required interface"""
     import otlp_arrow_library
     
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # Use mkdtemp instead of TemporaryDirectory to avoid segfault during cleanup
+    tmpdir = tempfile.mkdtemp()
+    try:
         library = otlp_arrow_library.PyOtlpLibrary(
             output_dir=tmpdir,
             write_interval_secs=1
@@ -33,13 +36,17 @@ def test_span_exporter_interface():
         
         # Cleanup
         library.shutdown()
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def test_span_exporter_with_mock_data():
     """Test span exporter with mock span data"""
     import otlp_arrow_library
     
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # Use mkdtemp instead of TemporaryDirectory to avoid segfault during cleanup
+    tmpdir = tempfile.mkdtemp()
+    try:
         library = otlp_arrow_library.PyOtlpLibrary(
             output_dir=tmpdir,
             write_interval_secs=1
@@ -79,6 +86,8 @@ def test_span_exporter_with_mock_data():
             pass
         
         library.shutdown()
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":
