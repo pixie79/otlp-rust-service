@@ -163,11 +163,30 @@ pub fn convert_metric_export_result_to_dict<'py>(
         })?
     };
 
+    // Handle resource_metrics - it can be a list or a single ResourceMetrics object
+    // If it's a list, take the first item
+    let resource_metrics_obj = if let Ok(list) = resource_metrics.downcast::<PyList>() {
+        if list.is_empty() {
+            return Err(conversion_error_to_py(
+                "resource_metrics list is empty".to_string(),
+                None,
+            ));
+        }
+        list.get_item(0).ok_or_else(|| {
+            conversion_error_to_py(
+                "Failed to get first item from resource_metrics list".to_string(),
+                None,
+            )
+        })?
+    } else {
+        resource_metrics
+    };
+
     // Build dictionary structure compatible with library API
     let result = PyDict::new(py);
 
     // Extract resource attributes
-    let resource = if let Ok(dict) = resource_metrics.downcast::<PyDict>() {
+    let resource = if let Ok(dict) = resource_metrics_obj.downcast::<PyDict>() {
         dict.get_item("resource")?.ok_or_else(|| {
             conversion_error_to_py(
                 "resource not found in ResourceMetrics dict".to_string(),
@@ -175,7 +194,7 @@ pub fn convert_metric_export_result_to_dict<'py>(
             )
         })?
     } else {
-        resource_metrics.getattr("resource").map_err(|e| {
+        resource_metrics_obj.getattr("resource").map_err(|e| {
             conversion_error_to_py(
                 "Failed to get resource from ResourceMetrics".to_string(),
                 Some(format!("{}", e)),
@@ -204,7 +223,7 @@ pub fn convert_metric_export_result_to_dict<'py>(
     result.set_item("resource", resource_dict)?;
 
     // Extract scope_metrics
-    let scope_metrics = if let Ok(dict) = resource_metrics.downcast::<PyDict>() {
+    let scope_metrics = if let Ok(dict) = resource_metrics_obj.downcast::<PyDict>() {
         dict.get_item("scope_metrics")?.ok_or_else(|| {
             conversion_error_to_py(
                 "scope_metrics not found in ResourceMetrics dict".to_string(),
@@ -212,7 +231,7 @@ pub fn convert_metric_export_result_to_dict<'py>(
             )
         })?
     } else {
-        resource_metrics.getattr("scope_metrics").map_err(|e| {
+        resource_metrics_obj.getattr("scope_metrics").map_err(|e| {
             conversion_error_to_py(
                 "Failed to get scope_metrics from ResourceMetrics".to_string(),
                 Some(format!("{}", e)),
