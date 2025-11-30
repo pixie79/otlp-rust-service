@@ -35,22 +35,14 @@ atexit.register(_cleanup_libraries)
 @pytest.fixture(autouse=True)
 def cleanup_after_test():
     """
-    Ensures that any OtlpLibrary instances are properly cleaned up after each test.
+    Minimal cleanup fixture - avoid aggressive cleanup that can trigger segfaults.
     
-    This fixture runs automatically after each test to prevent resource leaks
-    and potential issues with the Tokio runtime persisting between tests,
-    which can lead to segfaults during pytest cleanup.
+    The segfault is happening during pytest's teardown phase, so we avoid
+    doing anything that might interfere with pytest's cleanup process.
     """
     yield
-    
-    # Force garbage collection to trigger __del__ methods
-    # But be careful - aggressive GC can sometimes trigger segfaults
-    # if objects are dropped in an unexpected order or if Python is already finalizing
-    try:
-        gc.collect()
-    except Exception:
-        # Ignore errors during GC - Python may be finalizing
-        pass
+    # Don't do anything - let pytest and Python handle cleanup naturally
+    # Aggressive cleanup can trigger segfaults during teardown
 
 
 @pytest.fixture
