@@ -30,7 +30,6 @@ import re
 import sys
 from datetime import datetime
 from typing import Dict, List, Optional
-from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
