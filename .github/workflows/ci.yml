@@ -117,8 +117,12 @@ jobs:
             grep -E "(PASSED|FAILED|ERROR|SKIPPED)" /tmp/pytest_output.log | tail -20 || true
             echo ""
             echo "=== Failed Test Details ==="
-            # Extract error messages for failed tests
-            awk '/FAILED/,/PASSED|ERROR|SKIPPED|^tests\// {print}' /tmp/pytest_output.log | head -100 || true
+            # Extract error messages for failed tests - show full traceback
+            # Look for FAILED lines and show the context around them
+            awk '/FAILED/ {flag=1; count=0} flag && count<30 {print; count++} /PASSED|ERROR|SKIPPED|^tests\// && flag {flag=0}' /tmp/pytest_output.log | head -200 || true
+            echo ""
+            echo "=== Full Error Output (last 100 lines) ==="
+            tail -100 /tmp/pytest_output.log || true
             echo ""
             
             # Check if timeout was hit
