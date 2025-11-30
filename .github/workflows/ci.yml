@@ -116,6 +116,10 @@ jobs:
             echo "=== Test Summary ==="
             grep -E "(PASSED|FAILED|ERROR|SKIPPED)" /tmp/pytest_output.log | tail -20 || true
             echo ""
+            echo "=== Failed Test Details ==="
+            # Extract error messages for failed tests
+            awk '/FAILED/,/PASSED|ERROR|SKIPPED|^tests\// {print}' /tmp/pytest_output.log | head -100 || true
+            echo ""
             
             # Check if timeout was hit
             if [ $EXIT_CODE -eq 124 ]; then
