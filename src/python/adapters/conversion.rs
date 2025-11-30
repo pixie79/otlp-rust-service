@@ -172,10 +172,10 @@ pub fn convert_metric_export_result_to_dict<'py>(
                 None,
             ));
         }
-        list.get_item(0).ok_or_else(|| {
+        list.get_item(0).map_err(|e| {
             conversion_error_to_py(
                 "Failed to get first item from resource_metrics list".to_string(),
-                None,
+                Some(format!("{}", e)),
             )
         })?
     } else {
