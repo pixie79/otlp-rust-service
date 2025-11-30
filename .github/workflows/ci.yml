@@ -255,17 +255,22 @@ jobs:
                 ERROR_TYPE="bus error"
               fi
               echo "⚠️  $ERROR_TYPE during pytest cleanup (exit code $EXIT_CODE)"
-              echo "   Checking if tests actually passed..."
-              # Re-run with minimal output to check test results
-              set +e
-              .venv/bin/pytest tests/python/ -v --tb=no -q 2>&1 | grep -q "FAILED" && TEST_FAILED=1 || TEST_FAILED=0
-              set -e
-              if [ $TEST_FAILED -eq 1 ]; then
-                echo "❌ Tests failed, exiting with error"
+              echo "   Checking test results from output log..."
+              # Check the log for test results instead of re-running (re-run might also crash)
+              FAILED_COUNT=$(grep -c "FAILED" /tmp/pytest_output.log || echo "0")
+              PASSED_COUNT=$(grep -c "PASSED" /tmp/pytest_output.log || echo "0")
+              echo "   Found $FAILED_COUNT failed tests and $PASSED_COUNT passed tests"
+              if [ "$FAILED_COUNT" -gt 0 ]; then
+                echo "❌ Tests failed before $ERROR_TYPE"
+                echo "   Showing failed test details:"
+                grep -A 5 "FAILED" /tmp/pytest_output.log | head -30 || true
                 exit 1
-              else
+              elif [ "$PASSED_COUNT" -gt 0 ]; then
                 echo "✅ All tests passed, ignoring cleanup $ERROR_TYPE (known issue)"
                 exit 0
+              else
+                echo "⚠️  No test results found in output - tests may not have run"
+                exit 1
               fi
             elif [ $EXIT_CODE -ne 0 ]; then
               echo "❌ Tests failed with exit code $EXIT_CODE"
