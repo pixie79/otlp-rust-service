@@ -23,8 +23,8 @@ use tokio::runtime::Runtime;
 /// Python wrapper for OtlpLibrary
 #[pyclass]
 pub struct PyOtlpLibrary {
-    library: Arc<OtlpLibrary>,
-    runtime: Arc<Runtime>,
+    pub(crate) library: Arc<OtlpLibrary>,
+    pub(crate) runtime: Arc<Runtime>,
 }
 
 #[pymethods]
@@ -166,18 +166,66 @@ impl PyOtlpLibrary {
 
     /// Force immediate flush of all buffered messages to disk
     pub fn flush(&self) -> PyResult<()> {
-        let library = self.library.clone();
-        self.runtime
-            .block_on(async move { library.flush().await })
-            .map_err(|e| PyRuntimeError::new_err(format!("Flush error: {}", e)))
+        Python::with_gil(|py| {
+            let library = self.library.clone();
+            let runtime = self.runtime.clone();
+            // Release GIL before blocking on async operation to prevent deadlocks and segfaults
+            py.allow_threads(|| {
+                runtime
+                    .block_on(async move { library.flush().await })
+                    .map_err(|e| PyRuntimeError::new_err(format!("Flush error: {}", e)))
+            })
+        })
     }
 
     /// Gracefully shut down the library, flushing all pending writes
     pub fn shutdown(&self) -> PyResult<()> {
         let library = self.library.clone();
-        self.runtime
-            .block_on(async move { library.shutdown().await })
-            .map_err(|e| PyRuntimeError::new_err(format!("Shutdown error: {}", e)))
+        let runtime = self.runtime.clone();
+        // Release GIL before blocking on async operation to prevent deadlocks and segfaults
+        Python::with_gil(|py| {
+            py.allow_threads(|| {
+                runtime
+                    .block_on(async move { library.shutdown().await })
+                    .map_err(|e| PyRuntimeError::new_err(format!("Shutdown error: {}", e)))
+            })
+        })
+    }
+
+    /// Create a Python OpenTelemetry SDK MetricExporter adapter
+    ///
+    /// Returns a Python class that implements Python OpenTelemetry SDK's MetricExporter
+    /// interface, enabling direct use with PeriodicExportingMetricReader.
+    ///
+    /// Returns:
+    ///     PyOtlpMetricExporterAdapter: A metric exporter adapter for Python OpenTelemetry SDK
+    ///
+    /// Example:
+    ///     ```python
+    ///     from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+    ///     library = PyOtlpLibrary(output_dir="/tmp/otlp")
+    ///     metric_exporter = library.metric_exporter_adapter()
+    ///     reader = PeriodicExportingMetricReader(metric_exporter)
+    ///     ```
+    pub fn metric_exporter_adapter(
+        slf: PyRef<'_, Self>,
+        py: Python<'_>,
+    ) -> PyResult<crate::python::adapters::PyOtlpMetricExporterAdapter> {
+        // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
+        // Use PyRef's into_py method which safely converts to Py<Self>
+        // This is the safe alternative that properly manages reference counts
+        use crate::python::adapters::LibraryRef;
+        // PyRef::into_py returns Py<PyAny>, we need to cast to Py<Self>
+        // SAFETY: We know the type is correct because slf is PyRef<Self>
+        // The reference count is already managed by PyRef::into_py, so we just need to cast
+        let py_any: Py<PyAny> = slf.into_py(py);
+        let library_ref: LibraryRef = unsafe {
+            // Cast Py<PyAny> to Py<Self> - safe because we know the type is correct
+            std::mem::transmute(py_any)
+        };
+        Ok(crate::python::adapters::PyOtlpMetricExporterAdapter {
+            library: library_ref,
+        })
     }
 
     /// Create a SpanExporter implementation for use with OpenTelemetry SDK
@@ -195,6 +243,40 @@ impl PyOtlpLibrary {
         let exporter = self.library.span_exporter();
         Ok(PyOtlpSpanExporter {
             exporter: Arc::new(exporter),
+        })
+    }
+
+    /// Create a Python OpenTelemetry SDK SpanExporter adapter
+    ///
+    /// Returns a Python class that implements Python OpenTelemetry SDK's SpanExporter
+    /// interface, enabling direct use with BatchSpanProcessor and TracerProvider.
+    ///
+    /// Returns:
+    ///     PyOtlpSpanExporterAdapter: A span exporter adapter for Python OpenTelemetry SDK
+    ///
+    /// Example:
+    ///     ```python
+    ///     from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    ///     library = PyOtlpLibrary(output_dir="/tmp/otlp")
+    ///     span_exporter = library.span_exporter_adapter()
+    ///     processor = BatchSpanProcessor(span_exporter)
+    ///     ```
+    pub fn span_exporter_adapter(
+        slf: PyRef<'_, Self>,
+        py: Python<'_>,
+    ) -> PyResult<crate::python::adapters::PyOtlpSpanExporterAdapter> {
+        // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
+        // Use PyRef's into_py method which safely converts to Py<Self>
+        // This is the safe alternative that properly manages reference counts
+        use crate::python::adapters::LibraryRef;
+        // PyRef::into_py returns Py<PyAny>, we need to cast to Py<Self>
+        // SAFETY: We know the type is correct because slf is PyRef<Self>
+        let library_ref: LibraryRef = unsafe {
+            let py_any: Py<PyAny> = slf.into_py(py);
+            Py::from_owned_ptr(py, py_any.as_ptr())
+        };
+        Ok(crate::python::adapters::PyOtlpSpanExporterAdapter {
+            library: library_ref,
         })
     }
 }
@@ -414,9 +496,11 @@ impl PyOtlpSpanExporter {
 
 /// Python module definition
 #[pymodule]
-fn otlp_arrow_library(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn otlp_arrow_library(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyOtlpLibrary>()?;
     m.add_class::<PyOtlpSpanExporter>()?;
+    m.add_class::<crate::python::adapters::PyOtlpMetricExporterAdapter>()?;
+    m.add_class::<crate::python::adapters::PyOtlpSpanExporterAdapter>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

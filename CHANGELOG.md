@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic migration via `cargo fix --edition`
 
 ### Added
+- **Python OpenTelemetry SDK Adapter Classes**: Added built-in Python adapter classes that implement Python OpenTelemetry SDK's `MetricExporter` and `SpanExporter` interfaces, enabling direct integration without custom adapter code
+  - `PyOtlpLibrary.metric_exporter_adapter()` - Returns `PyOtlpMetricExporterAdapter` that implements Python OpenTelemetry SDK's `MetricExporter` interface for use with `PeriodicExportingMetricReader`
+  - `PyOtlpLibrary.span_exporter_adapter()` - Returns `PyOtlpSpanExporterAdapter` that implements Python OpenTelemetry SDK's `SpanExporter` interface for use with `BatchSpanProcessor` and `TracerProvider`
+  - Automatic type conversion from Python OpenTelemetry SDK types to library-compatible formats
+  - Error handling that converts library errors to appropriate Python exceptions while preserving context
+  - Lifecycle management that handles Python OpenTelemetry SDK shutdown and flush methods gracefully
+  - Full support for Python 3.11+ on Windows, Linux, and macOS
+- **Comprehensive Test Suite**: Added unit, integration, and contract tests for Python adapters
+- **Documentation**: Added quickstart guide and updated API documentation for Python OpenTelemetry SDK integration
 - **Demo Application**: Added `examples/demo-app.rs` - A comprehensive demo application that demonstrates OTLP SDK usage
   - Enables dashboard by default for real-time telemetry visualization
   - Generates and exports mock metrics and spans

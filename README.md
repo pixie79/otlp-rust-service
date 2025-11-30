@@ -122,8 +122,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let library = OtlpLibrary::new(config).await?;
 
     // Create exporters for OpenTelemetry SDK
-    let metric_exporter = library.metric_exporter();
-    let span_exporter = library.span_exporter();
+    let metric_exporter = library.metric_exporter_adapter();
+    let span_exporter = library.span_exporter_adapter();
 
     // Use with OpenTelemetry SDK
     let metric_reader = PeriodicReader::builder(metric_exporter)
@@ -193,8 +193,8 @@ library = otlp_arrow_library.PyOtlpLibrary(
 )
 
 # Create exporters for OpenTelemetry SDK integration
-metric_exporter = library.metric_exporter()
-span_exporter = library.span_exporter()
+metric_exporter = library.metric_exporter_adapter()
+span_exporter = library.span_exporter_adapter()
 
 # Note: Direct Python OpenTelemetry SDK integration requires
 # adapter classes (see Issue #6). For now, use library methods directly.
@@ -350,6 +350,29 @@ See [API documentation](src/api/public.rs) for complete Rust API reference.
 ### Python API
 
 See [Python API contract](specs/001-otlp-arrow-library/contracts/python-api.md) for Python API reference.
+
+#### Python OpenTelemetry SDK Integration
+
+The library provides adapter classes for seamless integration with Python OpenTelemetry SDK:
+
+```python
+import otlp_arrow_library
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+# Create library instance
+library = otlp_arrow_library.PyOtlpLibrary(output_dir="./otlp_output")
+
+# Create adapters for Python OpenTelemetry SDK
+metric_exporter = library.metric_exporter_adapter()
+span_exporter = library.span_exporter_adapter()
+
+# Use directly with Python OpenTelemetry SDK
+metric_reader = PeriodicExportingMetricReader(metric_exporter)
+span_processor = BatchSpanProcessor(span_exporter)
+```
+
+See [Python OpenTelemetry SDK Adapter Quickstart](specs/004-python-otel-adapters/quickstart.md) for complete examples.
 
 ## Examples
 

@@ -614,7 +614,7 @@ class GitHubPRComments:
         pr_info = data["pr_info"]
         issue_comments = data["issue_comments"]
         review_comments = data["review_comments"]
-        reviews = data["reviews"]
+        reviews = data.get("reviews", [])
 
         # PR Header
         print(f"\n{'=' * 100}")

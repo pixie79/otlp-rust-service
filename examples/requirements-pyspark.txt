@@ -1,0 +1,19 @@
+# Requirements for PySpark Kafka Feed Example
+# Install with: pip install -r examples/requirements-pyspark.txt
+
+# PySpark
+pyspark>=3.5.0
+
+# Kafka support (included in PySpark, but listed for reference)
+# kafka-python>=2.0.2  # Optional, for additional Kafka utilities
+
+# OpenTelemetry SDK
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+
+# System monitoring
+psutil>=5.9.0
+
+# OTLP Arrow Library (build from source)
+# maturin develop --features python-extension
+

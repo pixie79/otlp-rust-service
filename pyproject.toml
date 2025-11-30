@@ -17,6 +17,6 @@ description = "OTLP Arrow Flight Library - Python bindings"
 version = "0.4.0"
 
 [tool.maturin]
-features = []
+features = ["python-extension"]
 module-name = "otlp_arrow_library"
 
