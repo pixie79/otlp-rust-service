@@ -1,6 +1,5 @@
 use otlp_arrow_library::config::ConfigLoader;
 use std::fs;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[test]

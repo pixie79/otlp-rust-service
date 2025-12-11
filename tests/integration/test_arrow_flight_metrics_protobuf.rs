@@ -3,8 +3,7 @@
 use arrow::array::*;
 use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
-use otlp_arrow_library::{Config, OtlpLibrary};
-use std::path::PathBuf;
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -66,14 +65,11 @@ async fn test_arrow_flight_metrics_protobuf_conversion() {
     // Create a temporary directory for testing
     let temp_dir = TempDir::new().unwrap();
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path()
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();
@@ -112,14 +108,11 @@ async fn test_arrow_flight_metrics_batch_storage() {
     // Create a temporary directory for testing
     let temp_dir = TempDir::new().unwrap();
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path()
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();

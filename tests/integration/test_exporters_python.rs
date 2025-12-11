@@ -1,7 +1,6 @@
 //! Integration tests for Python bindings of OtlpMetricExporter and OtlpSpanExporter
 
-use otlp_arrow_library::{Config, OtlpLibrary};
-use std::path::PathBuf;
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary};
 use std::process::Command;
 use tempfile::TempDir;
 

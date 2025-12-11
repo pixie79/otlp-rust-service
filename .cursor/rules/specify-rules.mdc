@@ -11,6 +11,8 @@ Auto-generated from all feature plans. Last updated: 2025-11-23
 - N/A (adapters delegate to existing `OtlpLibrary` storage) (004-python-otel-adapters)
 - Rust 1.75+ (stable channel, edition 2024) (005-demo-app)
 - Local filesystem (Arrow IPC format files in output directory) (005-demo-app)
+- Rust stable (latest, edition 2024), Python 3.11+ (006-security-bug-memory-fixes)
+- Local filesystem (Arrow IPC Streaming format files) - no changes (006-security-bug-memory-fixes)
 
 - Rust stable channel (latest stable, minimum 1.75+) (001-otlp-arrow-library)
 
@@ -30,10 +32,9 @@ cargo test [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECH
 Rust stable channel (latest stable, minimum 1.75+): Follow standard conventions
 
 ## Recent Changes
+- 006-security-bug-memory-fixes: Added Rust stable (latest, edition 2024), Python 3.11+
 - 005-demo-app: Added Rust 1.75+ (stable channel, edition 2024)
 - 004-python-otel-adapters: Added Rust 1.75+ (stable), Python 3.11+ + PyO3 0.20, opentelemetry-python (Python OpenTelemetry SDK), opentelemetry-sdk 0.31 (Rust)
-- 003-opentelemetry-exporters: Added Rust 1.75+ (stable channel, latest stable)
-- 001-otlp-arrow-library: Added Rust stable (latest), Python 3.11+
 
 
 <!-- MANUAL ADDITIONS START -->

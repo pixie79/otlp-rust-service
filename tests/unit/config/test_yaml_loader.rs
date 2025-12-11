@@ -3,7 +3,6 @@
 use otlp_arrow_library::config::{Config, ConfigLoader};
 use otlp_arrow_library::error::OtlpConfigError;
 use std::fs;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[test]

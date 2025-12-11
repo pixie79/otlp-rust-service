@@ -1,10 +1,9 @@
 //! Performance benchmark for latency
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use otlp_arrow_library::{Config, OtlpLibrary};
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary};
 use opentelemetry_sdk::trace::SpanData;
 use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
-use std::path::PathBuf;
 use std::time::Instant;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
@@ -37,14 +36,11 @@ fn bench_latency(c: &mut Criterion) {
     
     c.bench_function("export_trace_latency", |b| {
         let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            output_dir: PathBuf::from(temp_dir.path()),
-            write_interval_secs: 1,
-            trace_cleanup_interval_secs: 600,
-            metric_cleanup_interval_secs: 3600,
-            protocols: Default::default(),
-            forwarding: None,
-        };
+        let config = ConfigBuilder::new()
+            .output_dir(temp_dir.path())
+            .write_interval_secs(1)
+            .build()
+            .unwrap();
         
         let library = rt.block_on(OtlpLibrary::new(config)).unwrap();
         let span = create_test_span(0);
@@ -76,14 +72,11 @@ fn bench_latency(c: &mut Criterion) {
 
     c.bench_function("flush_latency", |b| {
         let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            output_dir: PathBuf::from(temp_dir.path()),
-            write_interval_secs: 1,
-            trace_cleanup_interval_secs: 600,
-            metric_cleanup_interval_secs: 3600,
-            protocols: Default::default(),
-            forwarding: None,
-        };
+        let config = ConfigBuilder::new()
+            .output_dir(temp_dir.path())
+            .write_interval_secs(1)
+            .build()
+            .unwrap();
         
         let library = rt.block_on(OtlpLibrary::new(config)).unwrap();
         

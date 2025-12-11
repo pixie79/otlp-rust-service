@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-11-30
+
+### Security
+- **Credential Storage**: Changed `AuthConfig::credentials` from `HashMap<String, String>` to `HashMap<String, SecretString>` to prevent credential exposure in logs, errors, or memory dumps
+  - Credentials are now zeroed in memory when dropped
+  - Credentials never appear in `Debug` or `Display` implementations
+  - Breaking change: API now requires `SecretString::new()` when creating credentials programmatically
+- **Path Traversal Protection**: Enhanced path validation in dashboard server to prevent directory traversal attacks
+  - Rejects absolute paths, UNC paths, and paths with `..` components
+  - Normalizes paths and resolves symlinks safely
+  - Verifies canonical paths stay within allowed directories
+- **HTTP Security Headers**: Added security headers to all HTTP responses
+  - `Content-Security-Policy: default-src 'self'` - Prevents XSS attacks
+  - `X-Frame-Options: DENY` - Prevents clickjacking (configurable via `DashboardConfig::x_frame_options`)
+  - `X-Content-Type-Options: nosniff` - Prevents MIME type sniffing
+  - `X-XSS-Protection: 1; mode=block` - Additional XSS protection
+- **Input Validation**: Improved URL validation using `url` crate for comprehensive parsing and validation
+  - Validates URL scheme (must be http or https)
+  - Validates host presence
+  - Provides clear error messages for invalid URLs
+
+### Fixed
+- **Auth Validation Logic**: Fixed mismatch between validation logic and actual credential key names
+  - `api_key` authentication now correctly checks for `"key"` credential (not `"api_key"` or `"token"`)
+  - `bearer_token` authentication correctly checks for `"token"` credential
+  - Removed duplicate `"basic"` case in validation
+- **Circuit Breaker**: Completed half-open state implementation
+  - Added `half_open_test_in_progress` flag to prevent concurrent test requests
+  - Properly handles success (transition to Closed) and failure (transition back to Open) in half-open state
+  - Prevents indefinite half-open state with timeout checks
+- **Python Memory Safety**: Fixed unsafe memory operations in Python bindings
+  - Replaced `std::mem::transmute` with safe `downcast()` operations
+  - Improved reference counting and GIL handling
+  - Added explicit lifetime management for PyRef usage
+- **Protobuf Encoding**: Implemented proper Protobuf encoding for HTTP forwarding
+  - Replaced empty buffer placeholders with `prost::Message::encode()`
+  - Added proper error handling for encoding failures
+
+### Added
+- **Buffer Limits**: Added configurable buffer size limits to prevent unbounded memory growth
+  - `Config::max_trace_buffer_size` (default: 10000)
+  - `Config::max_metric_buffer_size` (default: 10000)
+  - `BatchBuffer` now returns `BufferFull` error when limits are reached
+  - Validation ensures limits are > 0 and <= 1,000,000
+  - Environment variable support: `OTLP_MAX_TRACE_BUFFER_SIZE`, `OTLP_MAX_METRIC_BUFFER_SIZE`
+- **Security Documentation**: Added `SECURITY.md` with comprehensive security information
+  - Security model and assumptions
+  - Threat model and mitigations
+  - Vulnerability reporting process
+  - Security best practices
+  - Known security considerations
+
+### Changed
+- **Dependencies**: Added new dependencies for security and validation
+  - `secrecy = "0.8"` (with serde feature) - Secure credential storage
+  - `url = "2.5"` - Comprehensive URL parsing and validation
+
 ## [0.4.0] - 2025-11-27
 
 ### Changed

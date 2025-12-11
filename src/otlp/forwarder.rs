@@ -9,6 +9,8 @@ use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequ
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_sdk::metrics::data::ResourceMetrics;
 use opentelemetry_sdk::trace::SpanData;
+use prost::Message;
+use secrecy::ExposeSecret;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -32,6 +34,8 @@ struct CircuitBreaker {
     #[allow(dead_code)]
     timeout: Duration,
     half_open_timeout: Duration,
+    /// Flag to prevent concurrent test requests in half-open state
+    half_open_test_in_progress: Arc<Mutex<bool>>,
 }
 
 impl CircuitBreaker {
@@ -43,6 +47,7 @@ impl CircuitBreaker {
             failure_threshold,
             timeout,
             half_open_timeout: Duration::from_secs(30), // 30 seconds to test recovery
+            half_open_test_in_progress: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -72,24 +77,49 @@ impl CircuitBreaker {
                 }
             }
             CircuitState::HalfOpen => {
-                // Test if service recovered
+                // Check if a test is already in progress
+                let mut test_in_progress = self.half_open_test_in_progress.lock().await;
+                if *test_in_progress {
+                    return Err(OtlpError::Export(OtlpExportError::ForwardingError(
+                        "Circuit breaker is testing recovery (half-open)".to_string(),
+                    )));
+                }
+                // Mark test as in progress
+                *test_in_progress = true;
             }
             CircuitState::Closed => {
-                // Normal operation
+                // Normal operation - no special handling needed
             }
         }
 
         // Execute the operation
-        match f.await {
-            Ok(result) => {
-                // Success - reset circuit breaker
+        let result = f.await;
+
+        // Handle result based on current state
+        let current_state = *self.state.lock().await;
+        match (current_state, &result) {
+            (CircuitState::HalfOpen, Ok(_)) => {
+                // Success in half-open state - transition to closed and reset
                 *self.state.lock().await = CircuitState::Closed;
                 *self.failure_count.lock().await = 0;
                 *self.last_failure_time.lock().await = None;
-                Ok(result)
+                *self.half_open_test_in_progress.lock().await = false;
+                info!("Circuit breaker recovered - transitioning to closed state");
             }
-            Err(e) => {
-                // Failure - update circuit breaker
+            (CircuitState::HalfOpen, Err(_)) => {
+                // Failure in half-open state - transition back to open
+                *self.state.lock().await = CircuitState::Open;
+                *self.last_failure_time.lock().await = Some(Instant::now());
+                *self.half_open_test_in_progress.lock().await = false;
+                warn!("Circuit breaker test failed - transitioning back to open state");
+            }
+            (CircuitState::Closed, Ok(_)) => {
+                // Success in closed state - reset failure count
+                *self.failure_count.lock().await = 0;
+                *self.last_failure_time.lock().await = None;
+            }
+            (CircuitState::Closed, Err(_)) => {
+                // Failure in closed state - increment failure count
                 let mut failure_count = self.failure_count.lock().await;
                 *failure_count += 1;
                 *self.last_failure_time.lock().await = Some(Instant::now());
@@ -102,10 +132,16 @@ impl CircuitBreaker {
                         "Circuit breaker opened due to repeated failures"
                     );
                 }
-
-                Err(e)
+            }
+            _ => {
+                // Should not happen, but handle gracefully
+                if matches!(current_state, CircuitState::HalfOpen) {
+                    *self.half_open_test_in_progress.lock().await = false;
+                }
             }
         }
+
+        result
     }
 }
 
@@ -289,7 +325,7 @@ impl OtlpForwarder {
     /// Send Protobuf traces to remote endpoint
     async fn send_protobuf_traces(
         &self,
-        _request: ExportTraceServiceRequest,
+        request: ExportTraceServiceRequest,
     ) -> Result<(), OtlpError> {
         let url = self.config.endpoint_url.as_ref().ok_or_else(|| {
             OtlpError::Export(OtlpExportError::ForwardingError(
@@ -297,10 +333,14 @@ impl OtlpForwarder {
             ))
         })?;
 
-        // Serialize request to protobuf bytes using tonic's encoding
-        // Note: For HTTP forwarding, we'd typically use opentelemetry-otlp's HTTP exporter
-        // For now, this is a placeholder - full implementation would use proper HTTP/gRPC client
-        let buf = Vec::new(); // TODO: Implement proper Protobuf encoding for HTTP
+        // Serialize request to protobuf bytes using prost::Message::encode()
+        let mut buf = Vec::new();
+        request.encode(&mut buf).map_err(|e| {
+            OtlpError::Export(OtlpExportError::SerializationError(format!(
+                "Failed to encode Protobuf traces: {}",
+                e
+            )))
+        })?;
 
         // Build request with authentication
         let mut http_request = self
@@ -331,7 +371,7 @@ impl OtlpForwarder {
     /// Send Protobuf metrics to remote endpoint
     async fn send_protobuf_metrics(
         &self,
-        _request: ExportMetricsServiceRequest,
+        request: ExportMetricsServiceRequest,
     ) -> Result<(), OtlpError> {
         let url = self.config.endpoint_url.as_ref().ok_or_else(|| {
             OtlpError::Export(OtlpExportError::ForwardingError(
@@ -339,10 +379,14 @@ impl OtlpForwarder {
             ))
         })?;
 
-        // Serialize request to protobuf bytes using tonic's encoding
-        // Note: For HTTP forwarding, we'd typically use opentelemetry-otlp's HTTP exporter
-        // For now, this is a placeholder - full implementation would use proper HTTP/gRPC client
-        let buf = Vec::new(); // TODO: Implement proper Protobuf encoding for HTTP
+        // Serialize request to protobuf bytes using prost::Message::encode()
+        let mut buf = Vec::new();
+        request.encode(&mut buf).map_err(|e| {
+            OtlpError::Export(OtlpExportError::SerializationError(format!(
+                "Failed to encode Protobuf metrics: {}",
+                e
+            )))
+        })?;
 
         // Build request with authentication
         let mut http_request = self
@@ -409,8 +453,10 @@ impl OtlpForwarder {
                     let header_name = auth
                         .credentials
                         .get("header_name")
-                        .unwrap_or(&default_header);
-                    request = request.header(header_name, key);
+                        .map(|s| s.expose_secret().clone())
+                        .unwrap_or(default_header);
+                    // Expose secret only when needed for HTTP header
+                    request = request.header(header_name, key.expose_secret());
                 }
                 "bearer_token" => {
                     let token = auth.credentials.get("token").ok_or_else(|| {
@@ -419,7 +465,8 @@ impl OtlpForwarder {
                                 .to_string(),
                         ))
                     })?;
-                    request = request.bearer_auth(token);
+                    // Expose secret only when needed for HTTP header
+                    request = request.bearer_auth(token.expose_secret());
                 }
                 "basic" => {
                     let username = auth.credentials.get("username").ok_or_else(|| {
@@ -432,7 +479,9 @@ impl OtlpForwarder {
                             "Basic authentication requires 'password' in credentials".to_string(),
                         ))
                     })?;
-                    request = request.basic_auth(username, Some(password));
+                    // Expose secrets only when needed for HTTP header
+                    request = request
+                        .basic_auth(username.expose_secret(), Some(password.expose_secret()));
                 }
                 _ => {
                     return Err(OtlpError::Export(OtlpExportError::ForwardingError(

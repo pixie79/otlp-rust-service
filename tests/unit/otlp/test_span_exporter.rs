@@ -1,11 +1,10 @@
 //! Unit tests for OtlpSpanExporter
 
-use otlp_arrow_library::{Config, OtlpLibrary, OtlpSpanExporter};
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary, OtlpSpanExporter};
 use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceFlags, TraceId};
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::SpanData;
 use opentelemetry_sdk::Resource;
-use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
 
@@ -43,15 +42,11 @@ fn create_test_span(name: &str) -> SpanData {
 async fn test_otlp_span_exporter_export() {
     let temp_dir = TempDir::new().unwrap();
     
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-        dashboard: Default::default(),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
     let mut exporter = library.span_exporter();
@@ -70,15 +65,11 @@ async fn test_otlp_span_exporter_export() {
 async fn test_otlp_span_exporter_shutdown() {
     let temp_dir = TempDir::new().unwrap();
     
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-        dashboard: Default::default(),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
     let mut exporter = library.span_exporter();
@@ -97,15 +88,11 @@ async fn test_otlp_span_exporter_shutdown() {
 async fn test_otlp_span_exporter_error_conversion() {
     let temp_dir = TempDir::new().unwrap();
     
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-        dashboard: Default::default(),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
     let mut exporter = library.span_exporter();

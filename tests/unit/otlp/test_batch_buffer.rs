@@ -51,7 +51,7 @@ fn create_test_metrics() -> opentelemetry_sdk::metrics::data::ResourceMetrics {
 
 #[tokio::test]
 async fn test_batch_buffer_add_trace() {
-    let buffer = BatchBuffer::new(5); // 5 second interval
+    let buffer = BatchBuffer::new(5, 10000, 10000); // 5 second interval, default buffer sizes
     
     let span = create_test_span("test-span");
     
@@ -66,7 +66,7 @@ async fn test_batch_buffer_add_trace() {
 
 #[tokio::test]
 async fn test_batch_buffer_add_traces() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
     
     let spans = vec![
         create_test_span("span-1"),
@@ -85,7 +85,7 @@ async fn test_batch_buffer_add_traces() {
 
 #[tokio::test]
 async fn test_batch_buffer_add_metrics() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
     
     let metrics = create_test_metrics();
     
@@ -100,7 +100,7 @@ async fn test_batch_buffer_add_metrics() {
 
 #[tokio::test]
 async fn test_batch_buffer_take_traces() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
     
     let spans = vec![
         create_test_span("span-1"),
@@ -120,7 +120,7 @@ async fn test_batch_buffer_take_traces() {
 
 #[tokio::test]
 async fn test_batch_buffer_take_metrics() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
     
     let metrics = create_test_metrics();
     buffer.add_metrics(metrics).await.unwrap();
@@ -136,7 +136,7 @@ async fn test_batch_buffer_take_metrics() {
 
 #[tokio::test]
 async fn test_batch_buffer_should_write() {
-    let buffer = BatchBuffer::new(1); // 1 second interval
+    let buffer = BatchBuffer::new(1, 10000, 10000); // 1 second interval, default buffer sizes
     
     // Initially should not write (just created)
     let should_write = buffer.should_write().await;

@@ -5,7 +5,7 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 };
 use opentelemetry_proto::tonic::metrics::v1::ResourceMetrics;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
-use otlp_arrow_library::{Config, OtlpLibrary};
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary};
 use opentelemetry_sdk::metrics::data::ResourceMetrics as SdkResourceMetrics;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -47,14 +47,11 @@ async fn test_metrics_protobuf_e2e_public_api() {
     // Test end-to-end flow: Public API → Protobuf Storage → File Export
     let temp_dir = TempDir::new().unwrap();
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();
@@ -94,14 +91,11 @@ async fn test_metrics_protobuf_e2e_grpc() {
     // Test end-to-end flow: gRPC Protobuf → Direct Export (preserves protobuf structure)
     let temp_dir = TempDir::new().unwrap();
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();
@@ -188,14 +182,11 @@ async fn test_metrics_protobuf_e2e_multiple_sources() {
     // Test end-to-end flow with metrics from multiple sources (public API + gRPC)
     let temp_dir = TempDir::new().unwrap();
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();

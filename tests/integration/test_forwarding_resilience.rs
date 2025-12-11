@@ -1,9 +1,8 @@
 //! Integration test for local storage continuing during forwarding failures
 
-use otlp_arrow_library::{Config, ForwardingConfig, ForwardingProtocol, OtlpLibrary};
+use otlp_arrow_library::{ConfigBuilder, ForwardingConfig, ForwardingProtocol, OtlpLibrary};
 use opentelemetry_sdk::trace::SpanData;
 use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
-use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::time::Duration;
 
@@ -19,14 +18,11 @@ async fn test_local_storage_resilience_during_forwarding_failures() {
         authentication: None,
     };
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: Some(forwarding),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path()
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
 

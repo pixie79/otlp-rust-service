@@ -250,20 +250,27 @@ fn test_valid_cleanup_interval_min() {
 #[test]
 fn test_auth_config_validation() {
     use otlp_arrow_library::config::AuthConfig;
+    use secrecy::SecretString;
     use std::collections::HashMap;
 
     // Valid bearer token config
     let mut credentials = HashMap::new();
-    credentials.insert("token".to_string(), "secret-token".to_string());
+    credentials.insert(
+        "token".to_string(),
+        SecretString::new("secret-token".to_string()),
+    );
     let auth = AuthConfig {
         auth_type: "bearer_token".to_string(),
         credentials,
     };
     assert!(auth.validate().is_ok());
 
-    // Valid API key config
+    // Valid API key config (uses "key" not "api_key")
     let mut credentials = HashMap::new();
-    credentials.insert("api_key".to_string(), "secret-key".to_string());
+    credentials.insert(
+        "key".to_string(),
+        SecretString::new("secret-key".to_string()),
+    );
     let auth = AuthConfig {
         auth_type: "api_key".to_string(),
         credentials,
@@ -272,8 +279,14 @@ fn test_auth_config_validation() {
 
     // Valid basic auth config
     let mut credentials = HashMap::new();
-    credentials.insert("username".to_string(), "user".to_string());
-    credentials.insert("password".to_string(), "pass".to_string());
+    credentials.insert(
+        "username".to_string(),
+        SecretString::new("user".to_string()),
+    );
+    credentials.insert(
+        "password".to_string(),
+        SecretString::new("pass".to_string()),
+    );
     let auth = AuthConfig {
         auth_type: "basic".to_string(),
         credentials,
@@ -296,7 +309,10 @@ fn test_auth_config_validation() {
 
     // Invalid: basic auth without username
     let mut credentials = HashMap::new();
-    credentials.insert("password".to_string(), "pass".to_string());
+    credentials.insert(
+        "password".to_string(),
+        SecretString::new("pass".to_string()),
+    );
     let auth = AuthConfig {
         auth_type: "basic".to_string(),
         credentials,

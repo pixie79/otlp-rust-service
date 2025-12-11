@@ -212,17 +212,17 @@ impl PyOtlpLibrary {
         py: Python<'_>,
     ) -> PyResult<crate::python::adapters::PyOtlpMetricExporterAdapter> {
         // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
-        // Use PyRef's into_py method which safely converts to Py<Self>
-        // This is the safe alternative that properly manages reference counts
+        // Convert PyRef to Py by incrementing refcount and creating new Py handle
         use crate::python::adapters::LibraryRef;
-        // PyRef::into_py returns Py<PyAny>, we need to cast to Py<Self>
-        // SAFETY: We know the type is correct because slf is PyRef<Self>
-        // The reference count is already managed by PyRef::into_py, so we just need to cast
-        let py_any: Py<PyAny> = slf.into_py(py);
-        let library_ref: LibraryRef = unsafe {
-            // Cast Py<PyAny> to Py<Self> - safe because we know the type is correct
-            std::mem::transmute(py_any)
-        };
+        // SAFETY: slf is a valid PyRef<PyOtlpLibrary>, so as_ptr() is valid
+        // We increment the refcount to create a new reference that will be managed by Py
+        let ptr = slf.as_ptr();
+        unsafe {
+            pyo3::ffi::Py_INCREF(ptr);
+        }
+        // SAFETY: We've incremented the refcount, so from_owned_ptr is safe
+        // The Py handle will manage the reference count
+        let library_ref: LibraryRef = unsafe { Py::from_owned_ptr(py, ptr) };
         Ok(crate::python::adapters::PyOtlpMetricExporterAdapter {
             library: library_ref,
         })
@@ -266,15 +266,17 @@ impl PyOtlpLibrary {
         py: Python<'_>,
     ) -> PyResult<crate::python::adapters::PyOtlpSpanExporterAdapter> {
         // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
-        // Use PyRef's into_py method which safely converts to Py<Self>
-        // This is the safe alternative that properly manages reference counts
+        // Convert PyRef to Py by incrementing refcount and creating new Py handle
         use crate::python::adapters::LibraryRef;
-        // PyRef::into_py returns Py<PyAny>, we need to cast to Py<Self>
-        // SAFETY: We know the type is correct because slf is PyRef<Self>
-        let library_ref: LibraryRef = unsafe {
-            let py_any: Py<PyAny> = slf.into_py(py);
-            Py::from_owned_ptr(py, py_any.as_ptr())
-        };
+        // SAFETY: slf is a valid PyRef<PyOtlpLibrary>, so as_ptr() is valid
+        // We increment the refcount to create a new reference that will be managed by Py
+        let ptr = slf.as_ptr();
+        unsafe {
+            pyo3::ffi::Py_INCREF(ptr);
+        }
+        // SAFETY: We've incremented the refcount, so from_owned_ptr is safe
+        // The Py handle will manage the reference count
+        let library_ref: LibraryRef = unsafe { Py::from_owned_ptr(py, ptr) };
         Ok(crate::python::adapters::PyOtlpSpanExporterAdapter {
             library: library_ref,
         })

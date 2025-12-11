@@ -4,8 +4,7 @@
 //! with gRPC servers for both Protobuf and Arrow Flight protocols.
 
 use otlp_arrow_library::otlp::{OtlpArrowFlightServer, OtlpGrpcServer};
-use otlp_arrow_library::{Config, OtlpLibrary};
-use std::path::PathBuf;
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary};
 use tokio::signal;
 use tracing::{info, warn};
 
@@ -16,15 +15,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load configuration
     // In production, you would load from YAML file or environment variables
-    let config = Config {
-        output_dir: PathBuf::from("./output_dir"),
-        write_interval_secs: 5,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(), // Both Protobuf and Arrow Flight enabled
-        forwarding: None,              // No forwarding by default
-        dashboard: Default::default(), // Dashboard disabled by default
-    };
+    let config = ConfigBuilder::new()
+        .output_dir("./output_dir")
+        .build()
+        .unwrap();
 
     // Create library instance (clone config since we need it later)
     let config_clone = config.clone();

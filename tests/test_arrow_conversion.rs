@@ -52,22 +52,17 @@ async fn test_arrow_ipc_conversion_traces() {
     ];
 
     // Import the exporter to test conversion
-    use otlp_arrow_library::Config;
+    use otlp_arrow_library::ConfigBuilder;
     use otlp_arrow_library::otlp::OtlpFileExporter;
-    use std::path::PathBuf;
     use tempfile::TempDir;
 
     // Create a temporary directory for testing
     let temp_dir = TempDir::new().unwrap();
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 5,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-        dashboard: Default::default(),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(5)
+        .build()
+        .unwrap();
 
     // Create exporter
     let exporter = OtlpFileExporter::new(&config).unwrap();
@@ -151,21 +146,16 @@ async fn test_arrow_ipc_conversion_traces() {
 
 #[tokio::test]
 async fn test_arrow_ipc_conversion_empty_traces() {
-    use otlp_arrow_library::Config;
+    use otlp_arrow_library::ConfigBuilder;
     use otlp_arrow_library::otlp::OtlpFileExporter;
-    use std::path::PathBuf;
     use tempfile::TempDir;
 
     let temp_dir = TempDir::new().unwrap();
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 5,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-        dashboard: Default::default(),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(5)
+        .build()
+        .unwrap();
 
     let exporter = OtlpFileExporter::new(&config).unwrap();
 

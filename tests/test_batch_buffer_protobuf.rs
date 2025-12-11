@@ -38,7 +38,7 @@ fn create_test_protobuf_metrics_request() -> ExportMetricsServiceRequest {
 
 #[tokio::test]
 async fn test_batch_buffer_add_metrics_protobuf() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
 
     let metrics_request = create_test_protobuf_metrics_request();
 
@@ -53,7 +53,7 @@ async fn test_batch_buffer_add_metrics_protobuf() {
 
 #[tokio::test]
 async fn test_batch_buffer_take_metrics_protobuf() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
 
     let metrics_request = create_test_protobuf_metrics_request();
     buffer
@@ -80,7 +80,7 @@ async fn test_batch_buffer_take_metrics_protobuf() {
 
 #[tokio::test]
 async fn test_batch_buffer_multiple_metrics_protobuf() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
 
     // Add multiple metrics
     for i in 0..5 {
@@ -109,7 +109,7 @@ async fn test_batch_buffer_multiple_metrics_protobuf() {
 
 #[tokio::test]
 async fn test_batch_buffer_protobuf_clone_support() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
 
     let metrics_request = create_test_protobuf_metrics_request();
 
