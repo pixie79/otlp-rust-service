@@ -8,21 +8,21 @@ echo "Running pre-commit checks..."
 # Check 1: Ensure code compiles
 echo "✓ Checking compilation..."
 export PYO3_PYTHON=/opt/homebrew/opt/python@3.12/bin/python3.12
-cargo check --no-default-features --workspace || {
+cargo check --all-features --workspace || {
     echo "✗ Compilation failed"
     exit 1
 }
 
 # Check 2: Run tests
 echo "✓ Running tests..."
-cargo test --no-default-features --workspace --quiet || {
+cargo test --all-features --workspace --quiet || {
     echo "✗ Tests failed"
     exit 1
 }
 
 # Check 3: Run clippy
 echo "✓ Running clippy..."
-cargo clippy --all-targets --no-default-features -- -D warnings || {
+cargo clippy --all-targets --all-features -- -A non_local_definitions -D warnings || {
     echo "✗ Clippy found issues"
     exit 1
 }
