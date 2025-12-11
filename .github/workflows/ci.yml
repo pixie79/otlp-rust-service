@@ -675,11 +675,5 @@ jobs:
           cargo publish --dry-run --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
       
       - name: Publish to crates.io
-        # Uncomment the following lines when ready to actually publish
-        # run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: |
-          echo "Publish step is commented out. To enable:"
-          echo "1. Add CARGO_REGISTRY_TOKEN to repository secrets (crates.io API token)"
-          echo "2. Uncomment the 'cargo publish' command above"
-          echo "Package built successfully and ready for publishing"
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
