@@ -21,9 +21,17 @@ cargo test --all-features --workspace --quiet || {
 }
 
 # Check 2b: Run Python tests (if venv exists and maturin is available)
-if [ -d ".venv" ] && command -v maturin >/dev/null 2>&1; then
-    echo "✓ Running Python tests..."
-    source .venv/bin/activate
+# Check for common venv directory names (.venv, .venv312, etc.)
+VENV_DIR=""
+if [ -d ".venv312" ]; then
+    VENV_DIR=".venv312"
+elif [ -d ".venv" ]; then
+    VENV_DIR=".venv"
+fi
+
+if [ -n "$VENV_DIR" ] && command -v maturin >/dev/null 2>&1; then
+    echo "✓ Running Python tests (using $VENV_DIR)..."
+    source "$VENV_DIR/bin/activate"
     export PYO3_PYTHON="$VIRTUAL_ENV/bin/python"
     # Build the Python package
     maturin develop --release --no-default-features || {
@@ -37,7 +45,11 @@ if [ -d ".venv" ] && command -v maturin >/dev/null 2>&1; then
     }
     deactivate
 else
-    echo "⚠ Skipping Python tests (venv not found or maturin not available)"
+    if [ -z "$VENV_DIR" ]; then
+        echo "⚠ Skipping Python tests (venv not found - checked .venv and .venv312)"
+    else
+        echo "⚠ Skipping Python tests (maturin not available)"
+    fi
 fi
 
 # Check 3: Run clippy
