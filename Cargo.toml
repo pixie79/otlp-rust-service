@@ -1,6 +1,6 @@
 [package]
 name = "otlp-arrow-library"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 authors = ["OTLP Rust Service Team"]
 description = "Cross-platform Rust library for receiving OTLP messages via gRPC and writing to Arrow IPC files"
