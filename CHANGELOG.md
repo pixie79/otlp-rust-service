@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2025-12-11
+
+### Fixed
+- **CI/CD Pipeline**: Enable cargo publish command in CI workflow
+  - Uncommented `cargo publish` command that was missing from v0.6.3 release
+  - Publishing now occurs automatically when all CI checks pass on main branch
+
 ## [0.6.3] - 2025-12-11
 
 ### Changed
