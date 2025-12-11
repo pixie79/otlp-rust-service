@@ -59,7 +59,13 @@ if test -z "$VIRTUAL_ENV_DISABLE_PROMPT"
         printf "%s%s%s" (set_color 4B8BBE) '(.venv312) ' (set_color normal)
 
         # Restore the return status of the previous command.
-        echo "exit $old_status" | .
+        # Execute a command that will have the desired exit status
+        # We use 'command false' or 'command true' to set status without side effects
+        if test $old_status -ne 0
+            command false
+        else
+            command true
+        end
         # Output the original/"old" prompt.
         _old_fish_prompt
     end
