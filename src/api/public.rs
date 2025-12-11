@@ -110,8 +110,12 @@ impl OtlpLibrary {
                 .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?,
         );
 
-        // Create batch buffer
-        let batch_buffer = Arc::new(BatchBuffer::new(config.write_interval_secs));
+        // Create batch buffer with size limits
+        let batch_buffer = Arc::new(BatchBuffer::new(
+            config.write_interval_secs,
+            config.max_trace_buffer_size,
+            config.max_metric_buffer_size,
+        ));
 
         // Start background write task
         let write_handle = Arc::new(Mutex::new(None));

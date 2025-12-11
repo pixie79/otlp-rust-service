@@ -207,6 +207,50 @@ impl ConfigLoader {
             config.metric_cleanup_interval_secs = secs;
         }
 
+        // OTLP_MAX_TRACE_BUFFER_SIZE
+        if let Ok(size) = env::var("OTLP_MAX_TRACE_BUFFER_SIZE") {
+            match size.parse::<usize>() {
+                Ok(s) => {
+                    debug!(
+                        env_var = "OTLP_MAX_TRACE_BUFFER_SIZE",
+                        value = s,
+                        "Applying environment variable override"
+                    );
+                    config.max_trace_buffer_size = s;
+                }
+                Err(e) => {
+                    warn!(
+                        env_var = "OTLP_MAX_TRACE_BUFFER_SIZE",
+                        value = %size,
+                        error = %e,
+                        "Failed to parse environment variable, using default"
+                    );
+                }
+            }
+        }
+
+        // OTLP_MAX_METRIC_BUFFER_SIZE
+        if let Ok(size) = env::var("OTLP_MAX_METRIC_BUFFER_SIZE") {
+            match size.parse::<usize>() {
+                Ok(s) => {
+                    debug!(
+                        env_var = "OTLP_MAX_METRIC_BUFFER_SIZE",
+                        value = s,
+                        "Applying environment variable override"
+                    );
+                    config.max_metric_buffer_size = s;
+                }
+                Err(e) => {
+                    warn!(
+                        env_var = "OTLP_MAX_METRIC_BUFFER_SIZE",
+                        value = %size,
+                        error = %e,
+                        "Failed to parse environment variable, using default"
+                    );
+                }
+            }
+        }
+
         // OTLP_PROTOBUF_ENABLED
         if let Ok(enabled) = env::var("OTLP_PROTOBUF_ENABLED") {
             match enabled.parse::<bool>() {

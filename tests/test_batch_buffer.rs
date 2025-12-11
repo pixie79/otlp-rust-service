@@ -43,7 +43,7 @@ fn create_test_span(name: &str) -> SpanData {
 
 #[tokio::test]
 async fn test_batch_buffer_add_trace() {
-    let buffer = BatchBuffer::new(5); // 5 second interval
+    let buffer = BatchBuffer::new(5, 10000, 10000); // 5 second interval, default buffer sizes
 
     let span = create_test_span("test-span");
 
@@ -58,7 +58,7 @@ async fn test_batch_buffer_add_trace() {
 
 #[tokio::test]
 async fn test_batch_buffer_add_traces() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
 
     let spans = vec![
         create_test_span("span-1"),
@@ -80,7 +80,7 @@ async fn test_batch_buffer_add_traces() {
 async fn test_batch_buffer_add_metrics() {
     use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
 
     // Create a minimal protobuf metrics request
     let metrics_request = ExportMetricsServiceRequest::default();
@@ -98,7 +98,7 @@ async fn test_batch_buffer_add_metrics() {
 async fn test_batch_buffer_take_metrics() {
     use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
 
     let metrics_request = ExportMetricsServiceRequest::default();
     buffer.add_metrics_protobuf(metrics_request).await.unwrap();
@@ -114,7 +114,7 @@ async fn test_batch_buffer_take_metrics() {
 
 #[tokio::test]
 async fn test_batch_buffer_take_traces() {
-    let buffer = BatchBuffer::new(5);
+    let buffer = BatchBuffer::new(5, 10000, 10000);
 
     let spans = vec![create_test_span("span-1"), create_test_span("span-2")];
 
@@ -131,7 +131,7 @@ async fn test_batch_buffer_take_traces() {
 
 #[tokio::test]
 async fn test_batch_buffer_should_write() {
-    let buffer = BatchBuffer::new(1); // 1 second interval
+    let buffer = BatchBuffer::new(1, 10000, 10000); // 1 second interval, default buffer sizes
 
     // Initially should not write (just created)
     let _should_write = buffer.should_write().await;

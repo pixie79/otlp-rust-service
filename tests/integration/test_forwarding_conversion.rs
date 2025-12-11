@@ -1,9 +1,8 @@
 //! Integration test for forwarding with format conversion
 
-use otlp_arrow_library::{Config, ForwardingConfig, ForwardingProtocol, OtlpLibrary};
+use otlp_arrow_library::{ConfigBuilder, ForwardingConfig, ForwardingProtocol, OtlpLibrary};
 use opentelemetry_sdk::trace::SpanData;
 use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
-use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::time::Duration;
 
@@ -19,14 +18,11 @@ async fn test_forwarding_protobuf_input_arrow_flight_output() {
         authentication: None,
     };
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: Some(forwarding),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path()
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
 
@@ -85,14 +81,11 @@ async fn test_forwarding_arrow_flight_input_protobuf_output() {
         authentication: None,
     };
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: Some(forwarding),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path()
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
 

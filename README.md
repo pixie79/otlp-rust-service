@@ -20,6 +20,12 @@ A cross-platform Rust library for receiving OpenTelemetry Protocol (OTLP) messag
 - **Metrics Collection**: Library operation metrics (messages received, files written, errors, conversions)
 - **OpenTelemetry SDK Integration**: Built-in `PushMetricExporter` and `SpanExporter` implementations for seamless integration with OpenTelemetry SDK
 - **Reference-Based Export**: Efficient metric export via `export_metrics_ref()` method that accepts references instead of requiring ownership
+- **Security Features**:
+  - Secure credential storage using `SecretString` (credentials zeroed in memory)
+  - Path traversal protection in dashboard server
+  - HTTP security headers (CSP, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection)
+  - Configurable buffer size limits to prevent memory exhaustion
+  - Comprehensive input validation (URL parsing, bounds checking)
 
 ## Quick Start
 
@@ -213,6 +219,8 @@ Configuration can be provided via:
 - `write_interval_secs`: How frequently to write batches to disk in seconds (default: 5)
 - `trace_cleanup_interval_secs`: Trace file retention interval in seconds (default: 600)
 - `metric_cleanup_interval_secs`: Metric file retention interval in seconds (default: 3600)
+- `max_trace_buffer_size`: Maximum number of trace spans to buffer in memory (default: 10000, max: 1000000)
+- `max_metric_buffer_size`: Maximum number of metric requests to buffer in memory (default: 10000, max: 1000000)
 - `protocols`: Protocol configuration
   - `protobuf_enabled`: Enable gRPC Protobuf server (default: true)
   - `protobuf_port`: Port for Protobuf server (default: 4317)
@@ -220,9 +228,20 @@ Configuration can be provided via:
   - `arrow_flight_port`: Port for Arrow Flight server (default: 4318)
 - `forwarding`: Optional remote forwarding configuration
   - `enabled`: Enable forwarding (default: false)
-  - `endpoint_url`: Remote endpoint URL (required if enabled)
+  - `endpoint_url`: Remote endpoint URL (required if enabled, must be valid http/https URL)
   - `protocol`: Forwarding protocol (Protobuf or ArrowFlight, default: Protobuf)
   - `authentication`: Optional authentication configuration
+    - `auth_type`: Authentication type (`api_key`, `bearer_token`, or `basic`)
+    - `credentials`: Authentication credentials (stored securely using `SecretString`)
+      - For `api_key`: requires `key` credential
+      - For `bearer_token`: requires `token` credential
+      - For `basic`: requires `username` and `password` credentials
+- `dashboard`: Dashboard HTTP server configuration
+  - `enabled`: Enable dashboard server (default: false)
+  - `port`: Dashboard port (default: 8080)
+  - `bind_address`: Bind address (default: `127.0.0.1` for localhost-only access)
+  - `x_frame_options`: X-Frame-Options header value (`DENY` or `SAMEORIGIN`, default: `DENY`)
+  - `static_dir`: Directory containing dashboard static files (default: `./dashboard/dist`)
 
 ### Example Configuration
 
@@ -253,6 +272,8 @@ forwarding:
 ```bash
 export OTLP_OUTPUT_DIR=./my_output
 export OTLP_WRITE_INTERVAL_SECS=10
+export OTLP_MAX_TRACE_BUFFER_SIZE=50000
+export OTLP_MAX_METRIC_BUFFER_SIZE=50000
 export OTLP_PROTOBUF_ENABLED=true
 export OTLP_ARROW_FLIGHT_ENABLED=true
 ```
@@ -420,6 +441,42 @@ The library collects operation metrics that can be accessed via `OtlpFileExporte
 - Files written
 - Errors encountered
 - Format conversions performed
+
+## Security
+
+The library implements multiple security features to protect credentials, prevent attacks, and ensure safe operation:
+
+### Credential Security
+
+- **Secure Storage**: All authentication credentials are stored using `SecretString`, which:
+  - Zeros memory when credentials are dropped
+  - Prevents credentials from appearing in logs or error messages
+  - Never exposes credentials in `Debug` or `Display` implementations
+
+### Path Traversal Protection
+
+- **Comprehensive Validation**: Dashboard server validates all file paths to prevent directory traversal attacks
+- **Symlink Handling**: Safely resolves symlinks and verifies paths stay within allowed directories
+- **Platform Support**: Works correctly on Windows, Linux, and macOS
+
+### HTTP Security Headers
+
+- **Content-Security-Policy**: Prevents XSS attacks
+- **X-Frame-Options**: Prevents clickjacking (configurable)
+- **X-Content-Type-Options**: Prevents MIME type sniffing
+- **X-XSS-Protection**: Additional XSS protection
+
+### Memory Safety
+
+- **Buffer Limits**: Configurable buffer size limits prevent unbounded memory growth
+- **Backpressure**: Returns `BufferFull` error when limits are reached instead of consuming unlimited memory
+
+### Input Validation
+
+- **URL Validation**: Comprehensive URL parsing and validation using the `url` crate
+- **Bounds Checking**: All numeric configuration values are validated for reasonable bounds
+
+For detailed security information, see [SECURITY.md](SECURITY.md).
 
 ## Implementation Notes
 

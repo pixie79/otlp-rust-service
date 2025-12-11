@@ -213,16 +213,16 @@ impl PyOtlpLibrary {
     ) -> PyResult<crate::python::adapters::PyOtlpMetricExporterAdapter> {
         // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
         // Use PyRef's into_py method which safely converts to Py<Self>
-        // This is the safe alternative that properly manages reference counts
+        // This properly manages reference counts without unsafe transmute
         use crate::python::adapters::LibraryRef;
-        // PyRef::into_py returns Py<PyAny>, we need to cast to Py<Self>
-        // SAFETY: We know the type is correct because slf is PyRef<Self>
-        // The reference count is already managed by PyRef::into_py, so we just need to cast
+        // PyRef::into_py returns Py<PyAny>, but we can safely downcast it
+        // The safer approach is to use Py::from() which properly handles the type conversion
         let py_any: Py<PyAny> = slf.into_py(py);
-        let library_ref: LibraryRef = unsafe {
-            // Cast Py<PyAny> to Py<Self> - safe because we know the type is correct
-            std::mem::transmute(py_any)
-        };
+        // Downcast to the correct type - this is safe because we know the type is correct
+        let library_ref: LibraryRef = py_any
+            .downcast(py)
+            .map_err(|_| PyRuntimeError::new_err("Failed to convert library reference"))?
+            .unbind();
         Ok(crate::python::adapters::PyOtlpMetricExporterAdapter {
             library: library_ref,
         })
@@ -267,14 +267,15 @@ impl PyOtlpLibrary {
     ) -> PyResult<crate::python::adapters::PyOtlpSpanExporterAdapter> {
         // Create a Py<PyOtlpLibrary> reference to prevent garbage collection
         // Use PyRef's into_py method which safely converts to Py<Self>
-        // This is the safe alternative that properly manages reference counts
+        // This properly manages reference counts without unsafe operations
         use crate::python::adapters::LibraryRef;
-        // PyRef::into_py returns Py<PyAny>, we need to cast to Py<Self>
-        // SAFETY: We know the type is correct because slf is PyRef<Self>
-        let library_ref: LibraryRef = unsafe {
-            let py_any: Py<PyAny> = slf.into_py(py);
-            Py::from_owned_ptr(py, py_any.as_ptr())
-        };
+        // PyRef::into_py returns Py<PyAny>, but we can safely downcast it
+        let py_any: Py<PyAny> = slf.into_py(py);
+        // Downcast to the correct type - this is safe because we know the type is correct
+        let library_ref: LibraryRef = py_any
+            .downcast(py)
+            .map_err(|_| PyRuntimeError::new_err("Failed to convert library reference"))?
+            .unbind();
         Ok(crate::python::adapters::PyOtlpSpanExporterAdapter {
             library: library_ref,
         })

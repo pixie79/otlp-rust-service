@@ -21,22 +21,31 @@ pub struct BatchBuffer {
     write_interval: Duration,
     /// Last write timestamp
     last_write: Arc<Mutex<std::time::SystemTime>>,
+    /// Maximum number of trace spans to buffer
+    max_trace_size: usize,
+    /// Maximum number of metric requests to buffer
+    max_metric_size: usize,
 }
 
 impl BatchBuffer {
-    /// Create a new batch buffer with the specified write interval
-    pub fn new(write_interval_secs: u64) -> Self {
+    /// Create a new batch buffer with the specified write interval and buffer limits
+    pub fn new(write_interval_secs: u64, max_trace_size: usize, max_metric_size: usize) -> Self {
         Self {
             traces: Arc::new(Mutex::new(Vec::new())),
             metrics: Arc::new(Mutex::new(Vec::new())),
             write_interval: Duration::from_secs(write_interval_secs),
             last_write: Arc::new(Mutex::new(std::time::SystemTime::now())),
+            max_trace_size,
+            max_metric_size,
         }
     }
 
     /// Add a trace span to the buffer
     pub async fn add_trace(&self, span: SpanData) -> Result<(), OtlpError> {
         let mut traces = self.traces.lock().await;
+        if traces.len() >= self.max_trace_size {
+            return Err(OtlpError::Export(crate::error::OtlpExportError::BufferFull));
+        }
         traces.push(span);
         Ok(())
     }
@@ -44,6 +53,9 @@ impl BatchBuffer {
     /// Add multiple trace spans to the buffer
     pub async fn add_traces(&self, spans: Vec<SpanData>) -> Result<(), OtlpError> {
         let mut traces = self.traces.lock().await;
+        if traces.len() + spans.len() > self.max_trace_size {
+            return Err(OtlpError::Export(crate::error::OtlpExportError::BufferFull));
+        }
         traces.extend(spans);
         Ok(())
     }
@@ -57,6 +69,9 @@ impl BatchBuffer {
         metrics: ExportMetricsServiceRequest,
     ) -> Result<(), OtlpError> {
         let mut buffered_metrics = self.metrics.lock().await;
+        if buffered_metrics.len() >= self.max_metric_size {
+            return Err(OtlpError::Export(crate::error::OtlpExportError::BufferFull));
+        }
         buffered_metrics.push(metrics);
         Ok(())
     }

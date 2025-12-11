@@ -372,10 +372,14 @@ impl PyOtlpSpanExporterAdapter {
         let spans_list = convert_span_sequence_to_dict_list(spans, py)?;
 
         // Get library instance and delegate to export_traces
+        // Extract library reference, then drop PyRef before async operation to prevent lifetime issues
         let library_ref = self.library.borrow(py);
-        library_ref
+        // export_traces clones internally, so we can drop the borrow immediately
+        let result = library_ref
             .export_traces(spans_list)
-            .map_err(|e| error_message_to_py(format!("Failed to export spans: {}", e)))?;
+            .map_err(|e| error_message_to_py(format!("Failed to export spans: {}", e)));
+        drop(library_ref); // Explicitly drop PyRef before any potential async operations
+        result?;
 
         // Return SpanExportResult.SUCCESS
         let span_export_result = py

@@ -1,9 +1,9 @@
 //! Integration test for forwarding with authentication
 
-use otlp_arrow_library::{Config, ForwardingConfig, ForwardingProtocol, AuthConfig, OtlpLibrary};
+use otlp_arrow_library::{ConfigBuilder, ForwardingConfig, ForwardingProtocol, AuthConfig, OtlpLibrary};
 use opentelemetry_sdk::trace::SpanData;
 use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
-use std::path::PathBuf;
+use secrecy::SecretString;
 use std::collections::HashMap;
 use tempfile::TempDir;
 use tokio::time::Duration;
@@ -13,8 +13,8 @@ async fn test_forwarding_with_api_key_auth() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut credentials = HashMap::new();
-    credentials.insert("key".to_string(), "test-api-key-123".to_string());
-    credentials.insert("header_name".to_string(), "X-API-Key".to_string());
+    credentials.insert("key".to_string(), SecretString::new("test-api-key-123".to_string()));
+    credentials.insert("header_name".to_string(), SecretString::new("X-API-Key".to_string()));
     
     let auth = AuthConfig {
         auth_type: "api_key".to_string(),
@@ -28,14 +28,12 @@ async fn test_forwarding_with_api_key_auth() {
         authentication: Some(auth),
     };
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: Some(forwarding),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .enable_forwarding(forwarding)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
 
@@ -87,7 +85,7 @@ async fn test_forwarding_with_bearer_token_auth() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut credentials = HashMap::new();
-    credentials.insert("token".to_string(), "test-bearer-token-456".to_string());
+    credentials.insert("token".to_string(), SecretString::new("test-bearer-token-456".to_string()));
     
     let auth = AuthConfig {
         auth_type: "bearer_token".to_string(),
@@ -101,14 +99,12 @@ async fn test_forwarding_with_bearer_token_auth() {
         authentication: Some(auth),
     };
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: Some(forwarding),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .enable_forwarding(forwarding)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
 
@@ -160,8 +156,8 @@ async fn test_forwarding_with_basic_auth() {
     let temp_dir = TempDir::new().unwrap();
     
     let mut credentials = HashMap::new();
-    credentials.insert("username".to_string(), "test-user".to_string());
-    credentials.insert("password".to_string(), "test-pass".to_string());
+    credentials.insert("username".to_string(), SecretString::new("test-user".to_string()));
+    credentials.insert("password".to_string(), SecretString::new("test-pass".to_string()));
     
     let auth = AuthConfig {
         auth_type: "basic".to_string(),
@@ -175,14 +171,12 @@ async fn test_forwarding_with_basic_auth() {
         authentication: Some(auth),
     };
 
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1,
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: Some(forwarding),
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path())
+        .write_interval_secs(1)
+        .enable_forwarding(forwarding)
+        .build()
+        .unwrap();
 
     let library = OtlpLibrary::new(config).await.unwrap();
 

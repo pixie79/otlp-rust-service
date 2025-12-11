@@ -1,11 +1,10 @@
 //! Integration test for file writing with default output directory
 
-use otlp_arrow_library::{Config, OtlpLibrary};
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary};
 use opentelemetry::trace::{SpanContext, SpanId, SpanKind, Status, TraceId, TraceFlags, TraceState};
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::trace::SpanData;
 use opentelemetry_sdk::Resource;
-use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
 
@@ -44,14 +43,11 @@ async fn test_file_writing_default_output_dir() {
     // Create a temporary directory for testing
     let temp_dir = TempDir::new().unwrap();
     
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1, // Short interval for testing
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path()
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     // Create library instance
     let library = OtlpLibrary::new(config).await.unwrap();

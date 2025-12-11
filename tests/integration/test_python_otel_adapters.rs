@@ -4,7 +4,6 @@
 
 use otlp_arrow_library::python::bindings::PyOtlpLibrary;
 use pyo3::prelude::*;
-use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 

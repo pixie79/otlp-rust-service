@@ -8,6 +8,12 @@ use std::path::PathBuf;
 
 use crate::error::OtlpConfigError;
 
+// Import SecretString for secure credential storage
+use secrecy::SecretString;
+
+// Import url crate for comprehensive URL validation
+use url::Url;
+
 /// Protocol to use for forwarding messages to remote endpoints
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -141,6 +147,7 @@ fn default_sdk_extraction_enabled() -> bool {
 ///     port: 8080,
 ///     static_dir: PathBuf::from("./dashboard/dist"),
 ///     bind_address: "127.0.0.1".to_string(), // or "0.0.0.0" for network access
+///     x_frame_options: None, // Optional: Some("DENY".to_string()) or Some("SAMEORIGIN".to_string())
 /// };
 /// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -161,6 +168,12 @@ pub struct DashboardConfig {
     /// Use 0.0.0.0 to allow network access from other machines
     #[serde(default = "default_dashboard_bind_address")]
     pub bind_address: String,
+
+    /// X-Frame-Options header value (default: "DENY")
+    /// Set to "SAMEORIGIN" to allow embedding in iframes from same origin
+    /// Only used if Some, otherwise defaults to "DENY" in server
+    #[serde(default)]
+    pub x_frame_options: Option<String>,
 }
 
 impl Default for DashboardConfig {
@@ -170,6 +183,7 @@ impl Default for DashboardConfig {
             port: default_dashboard_port(),
             static_dir: default_dashboard_static_dir(),
             bind_address: default_dashboard_bind_address(),
+            x_frame_options: None, // Default to None, server will use "DENY"
         }
     }
 }
@@ -215,6 +229,17 @@ impl DashboardConfig {
                 return Err(OtlpConfigError::InvalidOutputDir(format!(
                     "Dashboard static directory is not a directory: {}",
                     self.static_dir.display()
+                )));
+            }
+
+            // Validate x_frame_options if provided
+            if let Some(ref xfo) = self.x_frame_options
+                && xfo != "DENY"
+                && xfo != "SAMEORIGIN"
+            {
+                return Err(OtlpConfigError::ValidationFailed(format!(
+                    "x_frame_options must be 'DENY' or 'SAMEORIGIN' (got: {})",
+                    xfo
                 )));
             }
         }
@@ -297,6 +322,14 @@ pub struct Config {
     #[serde(default = "default_metric_cleanup_interval_secs")]
     pub metric_cleanup_interval_secs: u64,
 
+    /// Maximum number of trace spans to buffer in memory (default: 10000)
+    #[serde(default = "default_max_trace_buffer_size")]
+    pub max_trace_buffer_size: usize,
+
+    /// Maximum number of metric requests to buffer in memory (default: 10000)
+    #[serde(default = "default_max_metric_buffer_size")]
+    pub max_metric_buffer_size: usize,
+
     /// Protocol configuration (Protobuf and Arrow Flight)
     #[serde(default)]
     pub protocols: ProtocolConfig,
@@ -317,6 +350,8 @@ impl Default for Config {
             write_interval_secs: default_write_interval_secs(),
             trace_cleanup_interval_secs: default_trace_cleanup_interval_secs(),
             metric_cleanup_interval_secs: default_metric_cleanup_interval_secs(),
+            max_trace_buffer_size: default_max_trace_buffer_size(),
+            max_metric_buffer_size: default_max_metric_buffer_size(),
             protocols: ProtocolConfig::default(),
             forwarding: None,
             dashboard: DashboardConfig::default(),
@@ -375,6 +410,20 @@ impl Config {
             return Err(OtlpConfigError::InvalidInterval(
                 "Metric cleanup interval must be greater than 0".to_string(),
             ));
+        }
+
+        // Validate buffer size limits
+        if self.max_trace_buffer_size == 0 || self.max_trace_buffer_size > 1_000_000 {
+            return Err(OtlpConfigError::ValidationFailed(format!(
+                "max_trace_buffer_size must be between 1 and 1,000,000 (got {})",
+                self.max_trace_buffer_size
+            )));
+        }
+        if self.max_metric_buffer_size == 0 || self.max_metric_buffer_size > 1_000_000 {
+            return Err(OtlpConfigError::ValidationFailed(format!(
+                "max_metric_buffer_size must be between 1 and 1,000,000 (got {})",
+                self.max_metric_buffer_size
+            )));
         }
 
         // Validate cleanup intervals are reasonable (< 1 day)
@@ -472,11 +521,31 @@ impl ForwardingConfig {
                     ));
                 }
 
-                // Validate URL format
-                if !url.starts_with("http://") && !url.starts_with("https://") {
-                    return Err(OtlpConfigError::InvalidUrl(
-                        "Endpoint URL must use http:// or https:// scheme".to_string(),
-                    ));
+                // Comprehensive URL validation using url crate
+                let parsed_url = Url::parse(url).map_err(|e| {
+                    OtlpConfigError::InvalidUrl(format!(
+                        "Invalid endpoint URL format: {} (error: {})",
+                        url, e
+                    ))
+                })?;
+
+                // Validate scheme (must be http or https)
+                match parsed_url.scheme() {
+                    "http" | "https" => {}
+                    scheme => {
+                        return Err(OtlpConfigError::InvalidUrl(format!(
+                            "Endpoint URL must use http or https scheme (got: {}): {}",
+                            scheme, url
+                        )));
+                    }
+                }
+
+                // Validate host is present
+                if parsed_url.host().is_none() {
+                    return Err(OtlpConfigError::InvalidUrl(format!(
+                        "Endpoint URL must include a host: {}",
+                        url
+                    )));
                 }
             } else {
                 return Err(OtlpConfigError::MissingRequiredField(
@@ -510,23 +579,60 @@ impl ForwardingConfig {
 ///
 /// ```no_run
 /// use otlp_arrow_library::AuthConfig;
+/// use secrecy::SecretString;
 /// use std::collections::HashMap;
 ///
 /// let mut credentials = HashMap::new();
-/// credentials.insert("token".to_string(), "my-bearer-token".to_string());
+/// credentials.insert("token".to_string(), SecretString::new("my-bearer-token".to_string()));
 ///
 /// let auth = AuthConfig {
 ///     auth_type: "bearer_token".to_string(),
 ///     credentials,
 /// };
 /// ```
+///
+/// # Breaking Changes
+///
+/// As of version 0.4.0, `credentials` values are `SecretString` instead of `String`.
+/// When creating `AuthConfig` programmatically, use `SecretString::new()`.
+/// YAML and environment variable loading automatically converts strings to `SecretString`.
+///
+/// **Security Note**: Credentials are stored using `SecretString` to prevent exposure in logs,
+/// error messages, or memory dumps. Credentials are zeroed in memory when dropped.
+/// Credentials are NOT serialized for security reasons - they must be provided via environment
+/// variables or programmatic configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AuthConfig {
     /// Type of authentication (e.g., "api_key", "bearer_token", "basic")
     pub auth_type: String,
 
     /// Authentication parameters (e.g., token, key, username, password)
-    pub credentials: HashMap<String, String>,
+    /// Stored as SecretString to prevent exposure in logs, errors, or memory dumps.
+    ///
+    /// Required credentials by auth type:
+    /// - `api_key`: requires `key` credential
+    /// - `bearer_token`: requires `token` credential  
+    /// - `basic`: requires `username` and `password` credentials
+    ///
+    /// **Security**: Credentials are NOT serialized (skipped during serialization) to prevent
+    /// accidental exposure in configuration files or logs.
+    #[serde(skip_serializing, deserialize_with = "deserialize_secret_credentials")]
+    pub credentials: HashMap<String, SecretString>,
+}
+
+/// Custom deserializer for credentials that converts String to SecretString
+fn deserialize_secret_credentials<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<String, SecretString>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let map: HashMap<String, String> = HashMap::deserialize(deserializer)?;
+    Ok(map
+        .into_iter()
+        .map(|(k, v)| (k, SecretString::new(v)))
+        .collect())
 }
 
 impl AuthConfig {
@@ -540,14 +646,18 @@ impl AuthConfig {
 
         // Validate required credentials based on auth type
         match self.auth_type.as_str() {
-            "api_key" | "bearer_token" => {
-                if !self.credentials.contains_key("token")
-                    && !self.credentials.contains_key("api_key")
-                {
-                    return Err(OtlpConfigError::MissingRequiredField(format!(
-                        "token or api_key required for {}",
-                        self.auth_type
-                    )));
+            "api_key" => {
+                if !self.credentials.contains_key("key") {
+                    return Err(OtlpConfigError::MissingRequiredField(
+                        "key required for api_key authentication".to_string(),
+                    ));
+                }
+            }
+            "bearer_token" => {
+                if !self.credentials.contains_key("token") {
+                    return Err(OtlpConfigError::MissingRequiredField(
+                        "token required for bearer_token authentication".to_string(),
+                    ));
                 }
             }
             "basic" => {
@@ -606,6 +716,18 @@ impl ConfigBuilder {
     /// Set metric cleanup interval in seconds
     pub fn metric_cleanup_interval_secs(mut self, secs: u64) -> Self {
         self.config.metric_cleanup_interval_secs = secs;
+        self
+    }
+
+    /// Set maximum trace buffer size
+    pub fn max_trace_buffer_size(mut self, size: usize) -> Self {
+        self.config.max_trace_buffer_size = size;
+        self
+    }
+
+    /// Set maximum metric buffer size
+    pub fn max_metric_buffer_size(mut self, size: usize) -> Self {
+        self.config.max_metric_buffer_size = size;
         self
     }
 
@@ -697,4 +819,12 @@ fn default_trace_cleanup_interval_secs() -> u64 {
 
 fn default_metric_cleanup_interval_secs() -> u64 {
     3600
+}
+
+fn default_max_trace_buffer_size() -> usize {
+    10000
+}
+
+fn default_max_metric_buffer_size() -> usize {
+    10000
 }

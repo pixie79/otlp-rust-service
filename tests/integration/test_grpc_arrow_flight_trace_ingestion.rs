@@ -6,9 +6,8 @@ use arrow::ipc::writer::StreamWriter;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::FlightData;
-use otlp_arrow_library::{Config, OtlpLibrary};
+use otlp_arrow_library::{ConfigBuilder, OtlpLibrary};
 use std::io::Cursor;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -100,14 +99,11 @@ async fn test_grpc_arrow_flight_trace_ingestion() {
     // Create a temporary directory for testing
     let temp_dir = TempDir::new().unwrap();
     
-    let config = Config {
-        output_dir: PathBuf::from(temp_dir.path()),
-        write_interval_secs: 1, // Short interval for testing
-        trace_cleanup_interval_secs: 600,
-        metric_cleanup_interval_secs: 3600,
-        protocols: Default::default(),
-        forwarding: None,
-    };
+    let config = ConfigBuilder::new()
+        .output_dir(temp_dir.path()
+        .write_interval_secs(1)
+        .build()
+        .unwrap();
 
     // Create library instance
     let library = OtlpLibrary::new(config.clone()).await.unwrap();

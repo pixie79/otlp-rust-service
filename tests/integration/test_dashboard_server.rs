@@ -2,7 +2,6 @@ use otlp_arrow_library::config::ConfigLoader;
 use otlp_arrow_library::dashboard::server::DashboardServer;
 use std::fs;
 use std::io::Read;
-use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
