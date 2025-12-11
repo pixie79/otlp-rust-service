@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2025-12-11
+
+### Changed
+- **CI/CD Pipeline**: Enabled automatic publishing to crates.io
+  - Uncommented `cargo publish` command in publish workflow
+  - Publishing now occurs automatically when all CI checks pass on main branch
+
 ## [0.6.2] - 2025-12-11
 
 ### Fixed
