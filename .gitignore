@@ -5,8 +5,26 @@ release/
 *.rs.bk
 *.rlib
 *.prof*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
 scripts/__pycache__/*
 tests/python/__pycache__/*
+# Virtual environments
+.venv/
+.venv*/
+venv/
+venv*/
+ENV/
+env/
 
 # IDE
 .idea/
