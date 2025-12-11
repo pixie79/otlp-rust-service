@@ -653,7 +653,14 @@ jobs:
       - name: Verify package contents
         run: |
           # List files that would be included in the package (doesn't create package)
+          # Ensure .venv directories are excluded (they should be in .cargoignore and .gitignore)
           cargo package --list
+          # Verify .venv directories are not included
+          if cargo package --list 2>&1 | grep -q "\.venv"; then
+            echo "ERROR: .venv directories found in package list!"
+            cargo package --list 2>&1 | grep "\.venv"
+            exit 1
+          fi
       
       - name: Build crate package
         run: |
