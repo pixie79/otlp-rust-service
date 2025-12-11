@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2025-12-11
+
+### Changed
+- **CI/CD Pipeline**: Enabled publish job with automatic tag creation and issue closing
+  - Publish job now creates git tags automatically on release
+  - Automatically closes referenced GitHub issues when release is published
+  - Removed CHANGELOG and pyproject.toml updates from CI (handled locally)
+
 ## [0.6.0] - 2025-12-11
 
 ### Added
