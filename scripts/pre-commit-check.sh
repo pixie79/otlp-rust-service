@@ -13,12 +13,32 @@ cargo check --all-features --workspace || {
     exit 1
 }
 
-# Check 2: Run tests
-echo "✓ Running tests..."
+# Check 2: Run Rust tests
+echo "✓ Running Rust tests..."
 cargo test --all-features --workspace --quiet || {
-    echo "✗ Tests failed"
+    echo "✗ Rust tests failed"
     exit 1
 }
+
+# Check 2b: Run Python tests (if venv exists and maturin is available)
+if [ -d ".venv" ] && command -v maturin >/dev/null 2>&1; then
+    echo "✓ Running Python tests..."
+    source .venv/bin/activate
+    export PYO3_PYTHON="$VIRTUAL_ENV/bin/python"
+    # Build the Python package
+    maturin develop --release --no-default-features || {
+        echo "✗ Failed to build Python package"
+        exit 1
+    }
+    # Run Python tests
+    python -m pytest tests/python/ -v || {
+        echo "✗ Python tests failed"
+        exit 1
+    }
+    deactivate
+else
+    echo "⚠ Skipping Python tests (venv not found or maturin not available)"
+fi
 
 # Check 3: Run clippy
 echo "✓ Running clippy..."

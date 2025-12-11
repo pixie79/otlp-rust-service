@@ -269,6 +269,11 @@ impl OtlpFileExporter {
         &self,
         request: &opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest,
     ) -> Result<(), OtlpError> {
+        // Check if metrics are empty - if so, return early (empty metrics are valid)
+        if request.resource_metrics.is_empty() {
+            return Ok(());
+        }
+
         use crate::otlp::metrics_extractor::extract_from_protobuf;
 
         // Convert Protobuf → InternalResourceMetrics (our structure with public fields, no proxy)
