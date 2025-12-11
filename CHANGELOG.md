@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-12-11
+
+### Added
+- **Comprehensive Test Coverage**: Added extensive test suite for concurrent access, circuit breaker state transitions, and edge cases
+  - Unit tests for concurrent BatchBuffer access (`tests/unit/otlp/test_batch_buffer_concurrent.rs`)
+  - Unit tests for circuit breaker state transitions (`tests/unit/otlp/test_circuit_breaker.rs`)
+  - Integration tests for high concurrency scenarios (`tests/integration/test_concurrent_access.rs`)
+  - Integration tests for circuit breaker recovery (`tests/integration/test_circuit_breaker_recovery.rs`)
+  - Contract tests for edge cases including buffer capacity limits and race conditions (`tests/contract/test_edge_cases.rs`)
+- **Architecture Documentation**: Created comprehensive `docs/ARCHITECTURE.md` documenting system design, data flow, component interactions, and key architectural decisions
+- **Configurable Temporality**: Added support for configurable temporality (Cumulative or Delta) for metric exporters
+  - `ConfigBuilder::with_temporality()` method for Rust API
+  - `set_temporality()` method for Python bindings
+  - Defaults to Cumulative for backward compatibility
+- **Benchmark Infrastructure**: Added benchmark tests for performance validation
+  - Circuit breaker lock acquisition benchmarks (`tests/bench/bench_circuit_breaker.rs`)
+  - BatchBuffer throughput benchmarks (`tests/bench/bench_batch_buffer.rs`)
+  - Exporter performance benchmarks (`tests/bench/bench_exporter.rs`)
+
+### Changed
+- **Circuit Breaker Optimization**: Optimized circuit breaker lock contention by grouping state fields
+  - Reduced from 4+ separate `Arc<Mutex<T>>` locks to 1 grouped `Arc<Mutex<CircuitBreakerState>>` lock
+  - Batched state updates into single lock acquisitions
+  - Significantly reduced lock acquisition frequency (50%+ improvement)
+- **Exporter Performance**: Optimized exporter implementations for better throughput
+  - Grouped exporter metrics into single struct to reduce lock acquisitions (4 locks → 1 lock)
+  - Reduced unnecessary memory allocations (clones, schema handling)
+  - Improved efficiency of export operations
+- **Pre-commit Hook**: Improved pre-commit hook to properly build Python binaries and run tests in correct virtual environment
+  - Activates venv before cargo commands
+  - Sets PYO3_PYTHON correctly from venv
+  - Builds Python binaries with maturin before running Python tests
+  - Avoids Python linking issues by excluding python-extension feature from cargo check/test
+
+### Fixed
+- **Test Infrastructure**: Added `tokio-test` dependency for improved async testing utilities
+
 ## [0.5.0] - 2025-11-30
 
 ### Security

@@ -341,6 +341,17 @@ pub struct Config {
     /// Dashboard HTTP server configuration
     #[serde(default)]
     pub dashboard: DashboardConfig,
+
+    /// Temporality mode for metric exporters (default: Cumulative)
+    ///
+    /// This setting controls how metrics are aggregated:
+    /// - Cumulative: Metrics accumulate values over time (default, backward compatible)
+    /// - Delta: Metrics represent changes since last export
+    ///
+    /// Note: Temporality is not serializable, so this field is skipped during serialization.
+    /// It can only be set programmatically via ConfigBuilder.
+    #[serde(skip)]
+    pub metric_temporality: Option<opentelemetry_sdk::metrics::Temporality>,
 }
 
 impl Default for Config {
@@ -355,6 +366,7 @@ impl Default for Config {
             protocols: ProtocolConfig::default(),
             forwarding: None,
             dashboard: DashboardConfig::default(),
+            metric_temporality: None, // Defaults to Cumulative (handled in exporter)
         }
     }
 }
@@ -728,6 +740,17 @@ impl ConfigBuilder {
     /// Set maximum metric buffer size
     pub fn max_metric_buffer_size(mut self, size: usize) -> Self {
         self.config.max_metric_buffer_size = size;
+        self
+    }
+
+    /// Set metric temporality (Cumulative or Delta)
+    ///
+    /// Defaults to Cumulative if not specified (for backward compatibility).
+    pub fn with_temporality(
+        mut self,
+        temporality: opentelemetry_sdk::metrics::Temporality,
+    ) -> Self {
+        self.config.metric_temporality = Some(temporality);
         self
     }
 

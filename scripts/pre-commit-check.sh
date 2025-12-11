@@ -5,22 +5,7 @@ set -e
 
 echo "Running pre-commit checks..."
 
-# Check 1: Ensure code compiles
-echo "✓ Checking compilation..."
-export PYO3_PYTHON=/opt/homebrew/opt/python@3.12/bin/python3.12
-cargo check --all-features --workspace || {
-    echo "✗ Compilation failed"
-    exit 1
-}
-
-# Check 2: Run Rust tests
-echo "✓ Running Rust tests..."
-cargo test --all-features --workspace --quiet || {
-    echo "✗ Rust tests failed"
-    exit 1
-}
-
-# Check 2b: Run Python tests (if venv exists and maturin is available)
+# Setup Python environment FIRST (before cargo commands that might build Python bindings)
 # Check for common venv directory names (.venv, .venv312, etc.)
 VENV_DIR=""
 if [ -d ".venv312" ]; then
@@ -29,32 +14,95 @@ elif [ -d ".venv" ]; then
     VENV_DIR=".venv"
 fi
 
-if [ -n "$VENV_DIR" ] && command -v maturin >/dev/null 2>&1; then
-    echo "✓ Running Python tests (using $VENV_DIR)..."
+# Activate venv and set PYO3_PYTHON if venv exists
+if [ -n "$VENV_DIR" ]; then
+    echo "✓ Activating virtual environment ($VENV_DIR)..."
     source "$VENV_DIR/bin/activate"
     export PYO3_PYTHON="$VIRTUAL_ENV/bin/python"
-    # Build the Python package
-    maturin develop --release --no-default-features || {
-        echo "✗ Failed to build Python package"
+    echo "  Using Python: $PYO3_PYTHON"
+    
+    # Install Python dependencies
+    echo "✓ Installing Python dependencies..."
+    pip install --quiet --upgrade pip || {
+        echo "✗ Failed to upgrade pip"
+        deactivate 2>/dev/null || true
         exit 1
     }
-    # Run Python tests
-    python -m pytest tests/python/ -v || {
-        echo "✗ Python tests failed"
+    pip install --quiet maturin pytest opentelemetry-api opentelemetry-sdk || {
+        echo "✗ Failed to install Python dependencies"
+        deactivate 2>/dev/null || true
         exit 1
     }
-    deactivate
+    echo "  Python dependencies installed"
 else
-    if [ -z "$VENV_DIR" ]; then
-        echo "⚠ Skipping Python tests (venv not found - checked .venv and .venv312)"
-    else
-        echo "⚠ Skipping Python tests (maturin not available)"
+    # Fallback to system Python if venv not found
+    echo "⚠ No venv found, using system Python (Python tests will be skipped)"
+    # Try to find Python 3.12 in common locations
+    if [ -f "/opt/homebrew/opt/python@3.12/bin/python3.12" ]; then
+        export PYO3_PYTHON="/opt/homebrew/opt/python@3.12/bin/python3.12"
+    elif command -v python3.12 >/dev/null 2>&1; then
+        export PYO3_PYTHON=$(command -v python3.12)
+    elif command -v python3 >/dev/null 2>&1; then
+        export PYO3_PYTHON=$(command -v python3)
     fi
 fi
 
-# Check 3: Run clippy
+# Install Rust dependencies
+echo "✓ Installing Rust dependencies..."
+cargo fetch --quiet || {
+    echo "✗ Failed to fetch Rust dependencies"
+    [ -n "$VENV_DIR" ] && deactivate 2>/dev/null || true
+    exit 1
+}
+echo "  Rust dependencies installed"
+
+# Check 1: Ensure code compiles (without python-extension feature to avoid Python linking issues)
+echo "✓ Checking compilation..."
+cargo check --workspace || {
+    echo "✗ Compilation failed"
+    [ -n "$VENV_DIR" ] && deactivate 2>/dev/null || true
+    exit 1
+}
+
+# Check 2: Run Rust tests (without python-extension feature)
+# Note: python-extension feature requires Python linking and should only be used with maturin
+echo "✓ Running Rust tests..."
+cargo test --workspace --quiet || {
+    echo "✗ Rust tests failed"
+    [ -n "$VENV_DIR" ] && deactivate 2>/dev/null || true
+    exit 1
+}
+
+# Check 2b: Build Python binaries and run Python tests (if venv exists)
+if [ -n "$VENV_DIR" ]; then
+    if command -v maturin >/dev/null 2>&1; then
+        echo "✓ Building Python package (using $VENV_DIR)..."
+        # Build the Python package with python-extension feature enabled
+        maturin develop --release || {
+            echo "✗ Failed to build Python package"
+            deactivate 2>/dev/null || true
+            exit 1
+        }
+        
+        echo "✓ Running Python tests..."
+        # Run Python tests in the activated venv
+        python -m pytest tests/python/ -v || {
+            echo "✗ Python tests failed"
+            deactivate 2>/dev/null || true
+            exit 1
+        }
+        deactivate
+    else
+        echo "⚠ Skipping Python tests (maturin not available in venv after installation)"
+        deactivate 2>/dev/null || true
+    fi
+else
+    echo "⚠ Skipping Python tests (venv not found - checked .venv and .venv312)"
+fi
+
+# Check 3: Run clippy (without python-extension feature to avoid Python linking issues)
 echo "✓ Running clippy..."
-cargo clippy --all-targets --all-features -- -A non_local_definitions -D warnings || {
+cargo clippy --all-targets -- -A non_local_definitions -D warnings || {
     echo "✗ Clippy found issues"
     exit 1
 }

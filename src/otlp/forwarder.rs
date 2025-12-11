@@ -24,30 +24,44 @@ enum CircuitState {
     HalfOpen, // Testing if service recovered
 }
 
+/// Grouped circuit breaker state for optimized lock acquisition
+#[derive(Debug)]
+struct CircuitBreakerState {
+    state: CircuitState,
+    failure_count: u32,
+    last_failure_time: Option<Instant>,
+    half_open_test_in_progress: bool,
+}
+
+impl CircuitBreakerState {
+    fn new() -> Self {
+        Self {
+            state: CircuitState::Closed,
+            failure_count: 0,
+            last_failure_time: None,
+            half_open_test_in_progress: false,
+        }
+    }
+}
+
 /// Circuit breaker for forwarding failures
 #[derive(Debug)]
 struct CircuitBreaker {
-    state: Arc<Mutex<CircuitState>>,
-    failure_count: Arc<Mutex<u32>>,
-    last_failure_time: Arc<Mutex<Option<Instant>>>,
+    /// Grouped state - single lock for all state fields
+    state: Arc<Mutex<CircuitBreakerState>>,
     failure_threshold: u32,
     #[allow(dead_code)]
     timeout: Duration,
     half_open_timeout: Duration,
-    /// Flag to prevent concurrent test requests in half-open state
-    half_open_test_in_progress: Arc<Mutex<bool>>,
 }
 
 impl CircuitBreaker {
     fn new(failure_threshold: u32, timeout: Duration) -> Self {
         Self {
-            state: Arc::new(Mutex::new(CircuitState::Closed)),
-            failure_count: Arc::new(Mutex::new(0)),
-            last_failure_time: Arc::new(Mutex::new(None)),
+            state: Arc::new(Mutex::new(CircuitBreakerState::new())),
             failure_threshold,
             timeout,
             half_open_timeout: Duration::from_secs(30), // 30 seconds to test recovery
-            half_open_test_in_progress: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -55,15 +69,16 @@ impl CircuitBreaker {
     where
         F: std::future::Future<Output = Result<R, OtlpError>>,
     {
-        let state = *self.state.lock().await;
+        // Single lock acquisition for all state checks
+        let mut cb_state = self.state.lock().await;
+        let current_state = cb_state.state;
 
-        match state {
+        match current_state {
             CircuitState::Open => {
                 // Check if we should transition to half-open
-                let last_failure = self.last_failure_time.lock().await;
-                if let Some(failure_time) = *last_failure {
+                if let Some(failure_time) = cb_state.last_failure_time {
                     if failure_time.elapsed() >= self.half_open_timeout {
-                        *self.state.lock().await = CircuitState::HalfOpen;
+                        cb_state.state = CircuitState::HalfOpen;
                         info!("Circuit breaker transitioning to half-open state");
                     } else {
                         return Err(OtlpError::Export(OtlpExportError::ForwardingError(
@@ -78,56 +93,57 @@ impl CircuitBreaker {
             }
             CircuitState::HalfOpen => {
                 // Check if a test is already in progress
-                let mut test_in_progress = self.half_open_test_in_progress.lock().await;
-                if *test_in_progress {
+                if cb_state.half_open_test_in_progress {
                     return Err(OtlpError::Export(OtlpExportError::ForwardingError(
                         "Circuit breaker is testing recovery (half-open)".to_string(),
                     )));
                 }
                 // Mark test as in progress
-                *test_in_progress = true;
+                cb_state.half_open_test_in_progress = true;
             }
             CircuitState::Closed => {
                 // Normal operation - no special handling needed
             }
         }
 
+        // Drop lock before executing operation (to avoid holding lock during I/O)
+        drop(cb_state);
+
         // Execute the operation
         let result = f.await;
 
-        // Handle result based on current state
-        let current_state = *self.state.lock().await;
-        match (current_state, &result) {
+        // Single lock acquisition for all state updates
+        let mut cb_state = self.state.lock().await;
+        match (cb_state.state, &result) {
             (CircuitState::HalfOpen, Ok(_)) => {
                 // Success in half-open state - transition to closed and reset
-                *self.state.lock().await = CircuitState::Closed;
-                *self.failure_count.lock().await = 0;
-                *self.last_failure_time.lock().await = None;
-                *self.half_open_test_in_progress.lock().await = false;
+                cb_state.state = CircuitState::Closed;
+                cb_state.failure_count = 0;
+                cb_state.last_failure_time = None;
+                cb_state.half_open_test_in_progress = false;
                 info!("Circuit breaker recovered - transitioning to closed state");
             }
             (CircuitState::HalfOpen, Err(_)) => {
                 // Failure in half-open state - transition back to open
-                *self.state.lock().await = CircuitState::Open;
-                *self.last_failure_time.lock().await = Some(Instant::now());
-                *self.half_open_test_in_progress.lock().await = false;
+                cb_state.state = CircuitState::Open;
+                cb_state.last_failure_time = Some(Instant::now());
+                cb_state.half_open_test_in_progress = false;
                 warn!("Circuit breaker test failed - transitioning back to open state");
             }
             (CircuitState::Closed, Ok(_)) => {
                 // Success in closed state - reset failure count
-                *self.failure_count.lock().await = 0;
-                *self.last_failure_time.lock().await = None;
+                cb_state.failure_count = 0;
+                cb_state.last_failure_time = None;
             }
             (CircuitState::Closed, Err(_)) => {
                 // Failure in closed state - increment failure count
-                let mut failure_count = self.failure_count.lock().await;
-                *failure_count += 1;
-                *self.last_failure_time.lock().await = Some(Instant::now());
+                cb_state.failure_count += 1;
+                cb_state.last_failure_time = Some(Instant::now());
 
-                if *failure_count >= self.failure_threshold {
-                    *self.state.lock().await = CircuitState::Open;
+                if cb_state.failure_count >= self.failure_threshold {
+                    cb_state.state = CircuitState::Open;
                     warn!(
-                        failure_count = *failure_count,
+                        failure_count = cb_state.failure_count,
                         threshold = self.failure_threshold,
                         "Circuit breaker opened due to repeated failures"
                     );
@@ -135,8 +151,8 @@ impl CircuitBreaker {
             }
             _ => {
                 // Should not happen, but handle gracefully
-                if matches!(current_state, CircuitState::HalfOpen) {
-                    *self.half_open_test_in_progress.lock().await = false;
+                if matches!(cb_state.state, CircuitState::HalfOpen) {
+                    cb_state.half_open_test_in_progress = false;
                 }
             }
         }

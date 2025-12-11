@@ -225,6 +225,7 @@ impl PyOtlpLibrary {
         let library_ref: LibraryRef = unsafe { Py::from_owned_ptr(py, ptr) };
         Ok(crate::python::adapters::PyOtlpMetricExporterAdapter {
             library: library_ref,
+            temporality: std::sync::Mutex::new(None), // Default to None, will use Cumulative
         })
     }
 
