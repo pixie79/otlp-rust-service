@@ -36,11 +36,19 @@ pub struct OtlpFileExporter {
     max_file_size: u64,
     format: ExportFormat,
     forwarder: Option<Arc<crate::otlp::forwarder::OtlpForwarder>>,
-    // Metrics collection
-    messages_received: Arc<Mutex<u64>>,
-    files_written: Arc<Mutex<u64>>,
-    errors_count: Arc<Mutex<u64>>,
-    format_conversions: Arc<Mutex<u64>>,
+    // Metrics collection - grouped to reduce lock acquisitions
+    metrics: Arc<Mutex<ExporterMetrics>>,
+    /// Temporality mode for metric exporters (default: Cumulative)
+    temporality: opentelemetry_sdk::metrics::Temporality,
+}
+
+/// Grouped exporter metrics to reduce lock contention
+#[derive(Debug, Default)]
+struct ExporterMetrics {
+    messages_received: u64,
+    files_written: u64,
+    errors_count: u64,
+    format_conversions: u64,
 }
 
 impl std::fmt::Debug for OtlpFileExporter {
@@ -139,10 +147,10 @@ impl OtlpFileExporter {
             max_file_size,
             format: ExportFormat::Arrow,
             forwarder,
-            messages_received: Arc::new(Mutex::new(0)),
-            files_written: Arc::new(Mutex::new(0)),
-            errors_count: Arc::new(Mutex::new(0)),
-            format_conversions: Arc::new(Mutex::new(0)),
+            metrics: Arc::new(Mutex::new(ExporterMetrics::default())),
+            temporality: config
+                .metric_temporality
+                .unwrap_or(opentelemetry_sdk::metrics::Temporality::Cumulative),
         };
 
         Ok(exporter)
@@ -154,10 +162,10 @@ impl OtlpFileExporter {
             return Ok(());
         }
 
-        // Update metrics
+        // Update metrics (single lock acquisition)
         {
-            let mut count = self.messages_received.lock().await;
-            *count += spans.len() as u64;
+            let mut metrics = self.metrics.lock().await;
+            metrics.messages_received += spans.len() as u64;
         }
 
         // Convert spans to Arrow RecordBatch
@@ -171,17 +179,17 @@ impl OtlpFileExporter {
         if let Some(ref forwarder) = self.forwarder {
             if let Err(e) = forwarder.forward_traces(spans).await {
                 warn!(error = %e, "Failed to forward traces, but local storage succeeded");
-                // Update error metrics
+                // Update error metrics (single lock acquisition)
                 {
-                    let mut count = self.errors_count.lock().await;
-                    *count += 1;
+                    let mut metrics = self.metrics.lock().await;
+                    metrics.errors_count += 1;
                 }
                 // Don't fail - forwarding is best-effort
             } else {
-                // Update format conversion metrics if conversion occurred
+                // Update format conversion metrics if conversion occurred (single lock acquisition)
                 {
-                    let mut count = self.format_conversions.lock().await;
-                    *count += 1;
+                    let mut metrics = self.metrics.lock().await;
+                    metrics.format_conversions += 1;
                 }
             }
         }
@@ -198,6 +206,7 @@ impl OtlpFileExporter {
         batch: &arrow::record_batch::RecordBatch,
     ) -> Result<(), OtlpError> {
         let mut writer = self.traces_writer.lock().await;
+        // Clone output_dir to avoid borrow checker issues
         let output_dir = writer.output_dir.clone();
         let schema = batch.schema();
 
@@ -208,14 +217,15 @@ impl OtlpFileExporter {
         if writer.current_size + estimated_size > self.max_file_size {
             // Finish current writer before rotating
             if writer.current_writer.is_some() {
-                let saved_schema = writer.current_schema.clone();
+                // Save schema reference before rotation
+                let saved_schema = writer.current_schema.as_ref().cloned();
                 writer
                     .rotate_file(&output_dir, "traces", self.format)
                     .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
                 // Reopen with the same schema
-                if let Some(ref schema) = saved_schema {
+                if let Some(schema) = saved_schema {
                     writer
-                        .open_new_file(&output_dir, "traces", self.format, schema.clone())
+                        .open_new_file(&output_dir, "traces", self.format, schema)
                         .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
                 }
             }
@@ -224,7 +234,7 @@ impl OtlpFileExporter {
         // Open file and create StreamWriter if needed
         if writer.current_writer.is_none() {
             writer
-                .open_new_file(&output_dir, "traces", self.format, schema.clone())
+                .open_new_file(&output_dir, "traces", self.format, schema)
                 .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
         }
 
@@ -248,10 +258,10 @@ impl OtlpFileExporter {
                 estimated_size
             );
 
-            // Update metrics
+            // Update metrics (single lock acquisition)
             {
-                let mut count = self.files_written.lock().await;
-                *count += 1;
+                let mut metrics = self.metrics.lock().await;
+                metrics.files_written += 1;
             }
         }
 
@@ -305,6 +315,7 @@ impl OtlpFileExporter {
         batch: &arrow::record_batch::RecordBatch,
     ) -> Result<(), OtlpError> {
         let mut writer = self.metrics_writer.lock().await;
+        // Clone output_dir to avoid borrow checker issues
         let output_dir = writer.output_dir.clone();
         let schema = batch.schema();
 
@@ -315,14 +326,15 @@ impl OtlpFileExporter {
         if writer.current_size + estimated_size > self.max_file_size {
             // Finish current writer before rotating
             if writer.current_writer.is_some() {
-                let saved_schema = writer.current_schema.clone();
+                // Save schema reference before rotation
+                let saved_schema = writer.current_schema.as_ref().cloned();
                 writer
                     .rotate_file(&output_dir, "metrics", self.format)
                     .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
                 // Reopen with the same schema
-                if let Some(ref schema) = saved_schema {
+                if let Some(schema) = saved_schema {
                     writer
-                        .open_new_file(&output_dir, "metrics", self.format, schema.clone())
+                        .open_new_file(&output_dir, "metrics", self.format, schema)
                         .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
                 }
             }
@@ -331,7 +343,7 @@ impl OtlpFileExporter {
         // Open file and create StreamWriter if needed
         if writer.current_writer.is_none() {
             writer
-                .open_new_file(&output_dir, "metrics", self.format, schema.clone())
+                .open_new_file(&output_dir, "metrics", self.format, schema)
                 .map_err(|e| OtlpError::Io(std::io::Error::other(e.to_string())))?;
         }
 
@@ -354,10 +366,10 @@ impl OtlpFileExporter {
                 estimated_size
             );
 
-            // Update metrics
+            // Update metrics (single lock acquisition)
             {
-                let mut count = self.files_written.lock().await;
-                *count += 1;
+                let mut metrics = self.metrics.lock().await;
+                metrics.files_written += 1;
             }
         }
 
@@ -376,11 +388,13 @@ impl OtlpFileExporter {
     ///
     /// Returns a tuple of (messages_received, files_written, errors_count, format_conversions)
     pub async fn get_metrics(&self) -> (u64, u64, u64, u64) {
-        let messages = *self.messages_received.lock().await;
-        let files = *self.files_written.lock().await;
-        let errors = *self.errors_count.lock().await;
-        let conversions = *self.format_conversions.lock().await;
-        (messages, files, errors, conversions)
+        let metrics = self.metrics.lock().await;
+        (
+            metrics.messages_received,
+            metrics.files_written,
+            metrics.errors_count,
+            metrics.format_conversions,
+        )
     }
 
     /// Flush all pending writes
@@ -517,6 +531,13 @@ impl OtlpFileExporter {
         }
 
         Ok(())
+    }
+
+    /// Get the configured temporality mode for metric exporters
+    ///
+    /// This method is required by the OpenTelemetry SDK's PushMetricExporter trait.
+    pub fn temporality(&self) -> opentelemetry_sdk::metrics::Temporality {
+        self.temporality
     }
 }
 

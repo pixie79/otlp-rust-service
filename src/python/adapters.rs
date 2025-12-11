@@ -65,6 +65,8 @@ use pyo3::types::PyString;
 pub struct PyOtlpMetricExporterAdapter {
     /// Reference to the library instance (prevents garbage collection)
     pub(crate) library: LibraryRef,
+    /// Temporality mode for metric exporters (default: Cumulative)
+    pub(crate) temporality: std::sync::Mutex<Option<String>>, // Store as String to avoid PyO3 type issues
 }
 
 #[pymethods]
@@ -247,6 +249,37 @@ impl PyOtlpMetricExporterAdapter {
         }
     }
 
+    /// Set temporality mode for metric exporters
+    ///
+    /// # Arguments
+    ///
+    /// * `temporality` - Temporality enum value (CUMULATIVE or DELTA)
+    pub fn set_temporality(&self, temporality: &PyAny, _py: Python<'_>) -> PyResult<()> {
+        // Get the string representation of temporality
+        let temp_str = if let Ok(attr) = temporality.getattr("name") {
+            attr.to_string()
+        } else if let Ok(s) = temporality.extract::<String>() {
+            s
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Invalid temporality value. Expected Temporality.CUMULATIVE or Temporality.DELTA",
+            ));
+        };
+
+        // Validate temporality value
+        let temp_upper = temp_str.to_uppercase();
+        if temp_upper != "CUMULATIVE" && temp_upper != "DELTA" {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid temporality: {}. Expected CUMULATIVE or DELTA",
+                temp_str
+            )));
+        }
+
+        // Store temporality
+        *self.temporality.lock().unwrap() = Some(temp_upper);
+        Ok(())
+    }
+
     /// Return temporality preference
     ///
     /// Implements Python OpenTelemetry SDK's MetricExporter.temporality() method.
@@ -255,17 +288,27 @@ impl PyOtlpMetricExporterAdapter {
     ///
     /// Temporality enum value (default: CUMULATIVE)
     pub fn temporality(&self, py: Python<'_>) -> PyResult<PyObject> {
-        // Return Temporality.CUMULATIVE
+        // Get configured temporality or default to CUMULATIVE
+        // Convert to owned String to avoid borrow checker issues
+        let temp_str = self
+            .temporality
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|s| s.clone())
+            .unwrap_or_else(|| "CUMULATIVE".to_string());
+
+        // Return Temporality enum value
         let temporality_result = py
             .import("opentelemetry.sdk.metrics.export")
             .and_then(|module| module.getattr("Temporality"))
-            .and_then(|temporality| temporality.getattr("CUMULATIVE"));
+            .and_then(|temporality| temporality.getattr(temp_str.as_str()));
 
         match temporality_result {
-            Ok(cumulative) => Ok(cumulative.into()),
+            Ok(temp) => Ok(temp.into()),
             Err(_) => {
                 // Fallback: return a string representation
-                Ok(PyString::new(py, "CUMULATIVE").into_py(py))
+                Ok(PyString::new(py, temp_str.as_str()).into_py(py))
             }
         }
     }
@@ -281,20 +324,40 @@ impl PyOtlpMetricExporterAdapter {
     fn __getattr__(&self, name: &str, py: Python<'_>) -> PyResult<PyObject> {
         match name {
             "_preferred_temporality" => {
-                // Return a dict mapping metric types to AggregationTemporality.CUMULATIVE
+                // Get configured temporality or default to CUMULATIVE
+                // Convert to owned String to avoid borrow checker issues
+                let temp_str = self
+                    .temporality
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .map(|s| s.clone())
+                    .unwrap_or_else(|| "CUMULATIVE".to_string());
+
+                // Return a dict mapping metric types to AggregationTemporality
                 // The SDK expects: {Counter: CUMULATIVE, Histogram: CUMULATIVE, ...}
                 let temporality_dict = pyo3::types::PyDict::new(py);
 
-                // Safely import and get AggregationTemporality.CUMULATIVE
-                let cumulative = match py
+                // Safely import and get AggregationTemporality
+                let agg_temporality = match py
                     .import("opentelemetry.sdk.metrics.export")
                     .and_then(|module| module.getattr("AggregationTemporality"))
-                    .and_then(|agg_temp| agg_temp.getattr("CUMULATIVE"))
+                    .and_then(|agg_temp| agg_temp.getattr(temp_str.as_str()))
                 {
-                    Ok(cum) => cum,
+                    Ok(temp) => temp,
                     Err(_) => {
-                        // If import fails, return empty dict (SDK will handle it)
-                        return Ok(temporality_dict.into());
+                        // If import fails, try CUMULATIVE as fallback
+                        match py
+                            .import("opentelemetry.sdk.metrics.export")
+                            .and_then(|module| module.getattr("AggregationTemporality"))
+                            .and_then(|agg_temp| agg_temp.getattr("CUMULATIVE"))
+                        {
+                            Ok(cum) => cum,
+                            Err(_) => {
+                                // If import fails, return empty dict (SDK will handle it)
+                                return Ok(temporality_dict.into());
+                            }
+                        }
                     }
                 };
 
@@ -311,7 +374,7 @@ impl PyOtlpMetricExporterAdapter {
 
                     for metric_type_name in metric_types {
                         if let Ok(metric_type) = metrics_module.getattr(metric_type_name) {
-                            let _ = temporality_dict.set_item(metric_type, cumulative);
+                            let _ = temporality_dict.set_item(metric_type, agg_temporality);
                         }
                     }
                 }

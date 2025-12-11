@@ -20,6 +20,10 @@ A cross-platform Rust library for receiving OpenTelemetry Protocol (OTLP) messag
 - **Metrics Collection**: Library operation metrics (messages received, files written, errors, conversions)
 - **OpenTelemetry SDK Integration**: Built-in `PushMetricExporter` and `SpanExporter` implementations for seamless integration with OpenTelemetry SDK
 - **Reference-Based Export**: Efficient metric export via `export_metrics_ref()` method that accepts references instead of requiring ownership
+- **Configurable Temporality**: Support for Cumulative or Delta temporality modes for metric exporters (defaults to Cumulative)
+- **Comprehensive Test Coverage**: Extensive test suite covering concurrent access, circuit breaker state transitions, and edge cases
+- **Architecture Documentation**: Complete system architecture documentation in `docs/ARCHITECTURE.md`
+- **Performance Optimizations**: Optimized lock contention in circuit breaker and exporter implementations
 - **Security Features**:
   - Secure credential storage using `SecretString` (credentials zeroed in memory)
   - Path traversal protection in dashboard server
@@ -491,6 +495,7 @@ The library uses protobuf format (`ExportMetricsServiceRequest`) for internal me
 
 ## Documentation
 
+- [Architecture Documentation](docs/ARCHITECTURE.md) - System design, data flow, and component interactions
 - [Specification](specs/001-otlp-arrow-library/spec.md)
 - [Implementation Plan](specs/001-otlp-arrow-library/plan.md)
 - [Quickstart Guide](specs/001-otlp-arrow-library/quickstart.md)

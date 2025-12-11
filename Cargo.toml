@@ -1,6 +1,6 @@
 [package]
 name = "otlp-arrow-library"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 authors = ["OTLP Rust Service Team"]
 description = "Cross-platform Rust library for receiving OTLP messages via gRPC and writing to Arrow IPC files"
@@ -86,6 +86,7 @@ tempfile = "3.8"
 wiremock = "0.6"
 filetime = "0.2"
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+tokio-test = "0.4"  # Async testing utilities for concurrent test patterns
 
 [profile.release]
 opt-level = 3
