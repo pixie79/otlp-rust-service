@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2025-12-11
+
+### Fixed
+- **CI/CD Pipeline**: Fixed cargo package dry-run command in publish workflow
+  - Removed invalid `--dry-run` flag from `cargo package` command
+  - Updated to use `cargo package --list` for verification
+  - Updated to use `CARGO_REGISTRY_TOKEN` as recommended by crates.io documentation
+  - Fixed `cargo publish --dry-run` to use correct token secret name
+
 ## [0.6.1] - 2025-12-11
 
 ### Changed

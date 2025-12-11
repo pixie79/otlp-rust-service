@@ -650,20 +650,29 @@ jobs:
             fi
           done
       
-      - name: Verify package is ready for publishing
+      - name: Verify package contents
         run: |
-          cargo package --dry-run
-          cargo publish --dry-run
+          # List files that would be included in the package (doesn't create package)
+          cargo package --list
       
       - name: Build crate package
-        run: cargo package
+        run: |
+          # Create the package file (.crate)
+          cargo package
+      
+      - name: Verify publish readiness (dry-run)
+        run: |
+          # Use cargo publish --dry-run to verify everything is ready for publishing
+          # This checks metadata, dependencies, and registry compatibility
+          # CARGO_REGISTRY_TOKEN is the recommended environment variable name per crates.io docs
+          cargo publish --dry-run --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
       
       - name: Publish to crates.io
         # Uncomment the following lines when ready to actually publish
-        # run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        # run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           echo "Publish step is commented out. To enable:"
-          echo "1. Add CRATES_IO_TOKEN to repository secrets"
+          echo "1. Add CARGO_REGISTRY_TOKEN to repository secrets (crates.io API token)"
           echo "2. Uncomment the 'cargo publish' command above"
           echo "Package built successfully and ready for publishing"
 
